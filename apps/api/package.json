@@ -1,0 +1,33 @@
+{
+  "name": "@formcast/api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
+    "db:seed": "tsx scripts/seed.ts",
+    "e2e:voice": "tsx scripts/e2e-voice.ts",
+    "replay": "tsx scripts/replay.ts"
+  },
+  "dependencies": {
+    "@formcast/shared": "workspace:*",
+    "@google/genai": "^2.29.1",
+    "@neon/functions": "^0.11.0",
+    "drizzle-orm": "^0.45.4",
+    "hono": "^4.13.13",
+    "jose": "^6.2.12",
+    "pg": "^8.23.1",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "@types/pg": "^8.23.1",
+    "drizzle-kit": "^0.31.11",
+    "tsx": "^4.23.15",
+    "typescript": "^5.9.3",
+    "vitest": "^5.0.4"
+  }
+}

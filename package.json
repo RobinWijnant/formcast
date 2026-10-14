@@ -1,0 +1,19 @@
+{
+  "name": "formcast",
+  "private": true,
+  "packageManager": "pnpm@12.11.2",
+  "scripts": {
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm -r test",
+    "db:generate": "pnpm --filter @formcast/api db:generate",
+    "db:migrate": "pnpm --filter @formcast/api db:migrate",
+    "db:seed": "pnpm --filter @formcast/api db:seed",
+    "dev:api": "neon dev",
+    "dev:mobile": "pnpm --filter @formcast/mobile start",
+    "deploy:api": "neon deploy --env apps/api/.env.local"
+  },
+  "devDependencies": {
+    "@neon/config": "^1.9.1",
+    "typescript": "^5.9.3"
+  }
+}

@@ -1,0 +1,9 @@
+packages:
+  - apps/*
+  - packages/*
+allowBuilds:
+  '@google/genai': true
+  esbuild: true
+  protobufjs: true
+minimumReleaseAgeExclude:
+  - '@google/genai@2.29.1'

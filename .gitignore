@@ -1,0 +1,13 @@
+node_modules/
+.env
+.env.*
+!.env.example
+.neon
+dist/
+.expo/
+ios/
+android/
+*.tsbuildinfo
+.DS_Store
+coverage/
+apps/api/test/fixtures/*.wav
