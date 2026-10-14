@@ -8,7 +8,7 @@ export interface SttEvents {
   onInterim: (text: string) => void;
   onFinal: (text: string) => void;
   onError: (message: string) => void;
-  onClose: () => void;
+  onClose: (code: number, reason: string) => void;
 }
 
 interface DeepgramResult {
@@ -66,8 +66,8 @@ export function openDeepgram(events: SttEvents, sampleRate = AUDIO_SAMPLE_RATE) 
   ws.addEventListener('close', (event) => {
     clearInterval(keepAlive);
     open = false;
-    if (event.code !== 1000 && !closing) events.onError(`Speech recognition closed (${event.code})`);
-    events.onClose();
+    console.log(`[deepgram] closed code=${event.code} reason=${event.reason || '-'} requested=${closing}`);
+    events.onClose(event.code, event.reason);
   });
 
   return {

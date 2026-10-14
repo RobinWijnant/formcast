@@ -107,6 +107,15 @@ export function createVoiceSession(job: JobDetailDto, send: (msg: ServerMessage)
   }
 
   let stt: ReturnType<typeof openDeepgram> | undefined;
+  let sttRate: number | undefined;
+  let sttReopens = 0;
+  let audioBytes = 0;
+  const audioLog = setInterval(() => {
+    console.log(`[session] ${job.code} audio ${Math.round(audioBytes / 1024)} KB in 10 s, transcript ${transcript.length} segments`);
+    audioBytes = 0;
+  }, 10_000);
+  console.log(`[session] ${job.code} opened`);
+
   const openStt = (sampleRate?: number) => (stt ??= openDeepgram({
     onInterim: (interim) => send({ type: 'transcript', final: transcript.join(' '), interim }),
     onFinal: (text) => {
@@ -114,13 +123,27 @@ export function createVoiceSession(job: JobDetailDto, send: (msg: ServerMessage)
       send({ type: 'transcript', final: transcript.join(' '), interim: '' });
       schedule();
     },
-    onError: (message) => send({ type: 'error', code: 'stt', message }),
-    onClose: () => void finish(),
-  }, sampleRate));
+    onError: (message) => console.warn('[deepgram]', message),
+    onClose: (code) => {
+      stt = undefined;
+      if (stopping || finished) return void finish();
+      // Deepgram ended the stream while the technician is still talking (idle
+      // timeout, network blip): open a fresh one and keep the session alive.
+      if (sttReopens++ < 5) {
+        console.warn(`[session] ${job.code} speech stream closed (${code}), reopening`);
+        openStt(sttRate);
+      } else {
+        send({ type: 'error', code: 'stt', message: 'Speech recognition keeps dropping. Stop and try again.' });
+        void finish();
+      }
+    },
+  }, (sttRate = sampleRate ?? sttRate)));
 
   async function finish() {
     if (finished) return;
     finished = true;
+    clearInterval(audioLog);
+    console.log(`[session] ${job.code} finished (stopping=${stopping})`);
     clearTimeout(timer);
     trigger();
     await running;
@@ -133,6 +156,9 @@ export function createVoiceSession(job: JobDetailDto, send: (msg: ServerMessage)
 
   return {
     onAudio(chunk: ArrayBuffer) {
+      // An empty binary frame means "close stream" to Deepgram: never forward one.
+      if (!chunk.byteLength) return;
+      audioBytes += chunk.byteLength;
       if (!stopping) openStt().send(chunk);
     },
     onMessage(msg: ClientMessage) {
@@ -160,7 +186,9 @@ export function createVoiceSession(job: JobDetailDto, send: (msg: ServerMessage)
           break;
       }
     },
-    onClose() {
+    onClose(code?: number) {
+      if (!finished) console.log(`[session] ${job.code} client closed (${code ?? '-'}) before finishing`);
+      clearInterval(audioLog);
       stopping = true;
       finished = true;
       clearTimeout(timer);

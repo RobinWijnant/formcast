@@ -39,7 +39,7 @@ export function useVoiceSession(jobId: string) {
 
   const sendAudio = useCallback((data: ArrayBuffer) => {
     const socket = ws.current;
-    if (!socket || socket.readyState !== WebSocket.OPEN) return;
+    if (!socket || socket.readyState !== WebSocket.OPEN || !data.byteLength) return;
     if (ready.current) socket.send(data);
     else queue.current.push(data);
     const level = rms(data);
@@ -138,10 +138,13 @@ export function useVoiceSession(jobId: string) {
       setState('listening');
     };
     socket.onmessage = (e) => typeof e.data === 'string' && onMessage(e.data);
-    socket.onclose = () => {
+    socket.onclose = (event) => {
       stopAudio();
       if (!stopping.current) {
-        setError((err) => err ?? { kind: 'connection', message: 'Connection lost. Everything filled in so far stays on this phone.' });
+        console.warn(`[voice] socket closed unexpectedly code=${event.code} reason=${event.reason}`);
+        setError(
+          (err) => err ?? { kind: 'connection', message: `Connection lost (${event.code}). Everything filled in so far stays on this phone.` },
+        );
       }
       ws.current = null;
       ready.current = false;

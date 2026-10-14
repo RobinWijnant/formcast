@@ -113,10 +113,11 @@ app.get(
           session?.onAudio(event.data);
         }
       },
-      onClose() {
-        session?.onClose();
+      onClose(event) {
+        session?.onClose(event.code);
       },
       onError() {
+        console.warn('[session] socket error');
         session?.onClose();
       },
     };
