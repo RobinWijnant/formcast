@@ -13,6 +13,15 @@ import { colors, fonts } from '@/lib/theme';
 
 const DELAYS = [3000, 5000, 8000];
 
+/** Switch in a fixed-height box so it centres on the row like the labels. */
+function Toggle(props: React.ComponentProps<typeof Switch>) {
+  return (
+    <View style={styles.toggle}>
+      <Switch trackColor={{ true: colors.ink }} {...props} />
+    </View>
+  );
+}
+
 function Row({ label, children, onPress }: { label: string; children: React.ReactNode; onPress?: () => void }) {
   const content = (
     <>
@@ -88,17 +97,17 @@ export default function Settings() {
             </View>
           </Row>
           <Row label="Show live transcript">
-            <Switch accessibilityLabel="Show live transcript" value={prefs.showTranscript} onValueChange={(v) => prefs.update({ showTranscript: v })} trackColor={{ true: colors.ink }} />
+            <Toggle accessibilityLabel="Show live transcript" value={prefs.showTranscript} onValueChange={(v) => prefs.update({ showTranscript: v })} />
           </Row>
           <Row label="Vibrate when a field fills">
-            <Switch accessibilityLabel="Vibrate when a field fills" value={prefs.vibrateOnFill} onValueChange={(v) => prefs.update({ vibrateOnFill: v })} trackColor={{ true: colors.ink }} />
+            <Toggle accessibilityLabel="Vibrate when a field fills" value={prefs.vibrateOnFill} onValueChange={(v) => prefs.update({ vibrateOnFill: v })} />
           </Row>
         </View>
 
         <T style={styles.sec}>Demo</T>
         <View style={styles.card}>
           <Row label="Play recorded demo script">
-            <Switch accessibilityLabel="Play recorded demo script instead of the microphone" value={prefs.demoVoice} onValueChange={(v) => prefs.update({ demoVoice: v })} trackColor={{ true: colors.ink }} />
+            <Toggle accessibilityLabel="Play recorded demo script instead of the microphone" value={prefs.demoVoice} onValueChange={(v) => prefs.update({ demoVoice: v })} />
           </Row>
         </View>
         <T style={styles.note}>Streams the brief's demo script instead of the microphone. Each press of Start speaking plays the next round.</T>
@@ -131,6 +140,7 @@ const styles = StyleSheet.create({
   card: { marginHorizontal: 16, backgroundColor: colors.surface, borderRadius: 18, paddingHorizontal: 4 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 52, paddingHorizontal: 12, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.divider },
   label: { flex: 1, fontSize: 15, color: colors.text },
+  toggle: { height: 52, justifyContent: 'center', alignItems: 'flex-end' },
   value: { fontSize: 15, color: colors.textMuted },
   valueRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   note: { paddingHorizontal: 28, marginTop: 8, fontSize: 13, lineHeight: 18, color: colors.textFaint },
