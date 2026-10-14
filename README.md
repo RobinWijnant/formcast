@@ -12,7 +12,7 @@ Built for the Highsail full-stack case (Live Voice Form Filler).
 | Microphone priming | Shows the fill animation before the OS permission prompt |
 | Today | The technician's jobs in schedule order, week strip, travel gaps |
 | Job detail | Client, access note, map tile (opens directions), glass phone tile (calls), visit history, **Start job** |
-| Job form | Appliance (prefilled from the last visit), Measurements, Materials used, Conclusion, Job. Priority and tags in the header. **Start speaking** opens the live dock; **Save** top right |
+| Job form | Appliance (prefilled from the last visit), Measurements, Materials used, Conclusion, Job. Priority and tags in the header. **Start speaking** opens the live dock; tap any field, material or header pill to type instead; **Save** top right |
 | Settings | Speech language, auto-fill delay, live transcript, vibrate on fill, demo script, sign out |
 
 Designs: [docs/ux-flows.md](docs/ux-flows.md) · stack rationale: [docs/tech-stack.md](docs/tech-stack.md).
@@ -90,6 +90,5 @@ pnpm --filter @formcast/api e2e:voice       # macOS `say` → PCM → WebSocket 
 
 - Persist the draft locally (MMKV) and resume a session after an eviction.
 - Server-side session timeline (transcript + every proposal set) for debugging and an eval set; run `replay` in CI.
-- Manual editing of a field by tap as a fallback to voice.
 - Paid Gemini tier and streaming JSON output, to show proposals while the model is still writing.
 - Dutch + English speech, unit and number normalization tuned for the field.

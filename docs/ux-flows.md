@@ -84,7 +84,7 @@ The Finish review sheet (option B below) is dropped.
 - Sections: **Fields** (arrival, distance, priority, tags, job complete, remarks) and one section per **line group** (Materials).
 - Empty values show `—`; empty line group shows an inviting empty state ("Say what you used, e.g. '12 meters of cable'").
 - Primary sticky CTA at the bottom: **Start speaking** (mic).
-- Manual tap-to-edit is a fallback, not the focus (stretch).
+- Manual editing: tap any field, line, priority or tag pill (when not recording) to open an edit sheet. Manual edits become pending changes like voice ones (shown with a check) and are saved with Save.
 
 ### 3. Job form — listening (the core screen)
 Bottom area turns into a **live dock** (Granola-style sheet with a Fabric-style transcript card on top; see References):

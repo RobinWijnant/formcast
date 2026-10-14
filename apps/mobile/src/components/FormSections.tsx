@@ -1,4 +1,4 @@
-import { StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 import {
   FIELDS,
   GROUP_BY_KEY,
@@ -16,6 +16,8 @@ import {
 import { colors } from '@/lib/theme';
 import { shortDate } from '@/lib/date';
 import type { Draft } from '@/voice/drafts';
+import type { EditTarget } from './EditSheet';
+import { Icon } from './Icon';
 import { ProposalRow, type RowKind } from './ProposalRow';
 import { Card, SectionHeader, T } from './ui';
 
@@ -25,7 +27,7 @@ const titleCase = (s: unknown) => (typeof s === 'string' && s ? s.charAt(0).toUp
 const lineSub = (v: LineValues) =>
   [v.quantity !== undefined ? formatValue(col('quantity'), v.quantity) : null, v.unit ? formatValue(col('unit'), v.unit) : null].filter(Boolean).join(' ') || '—';
 
-function FieldRows({ section, job, draft, onReject }: { section: string; job: JobDetailDto; draft: Draft; onReject: (key: string) => void }) {
+function FieldRows({ section, job, draft, onReject, onEdit }: { section: string; job: JobDetailDto; draft: Draft; onReject: (key: string) => void; onEdit?: (t: EditTarget) => void }) {
   return (
     <Card>
       {FIELDS.filter((f) => f.section === section).map((f) => {
@@ -52,6 +54,8 @@ function FieldRows({ section, job, draft, onReject }: { section: string; job: Jo
             previous={previous}
             changedAt={draft.changedAt[key]}
             onReject={() => onReject(key)}
+            onPress={onEdit ? () => onEdit({ kind: 'field', fieldKey: f.key }) : undefined}
+            editLabel={`Edit ${f.label}`}
           />
         );
       })}
@@ -59,7 +63,7 @@ function FieldRows({ section, job, draft, onReject }: { section: string; job: Jo
   );
 }
 
-function MaterialRows({ job, draft, onReject }: { job: JobDetailDto; draft: Draft; onReject: (key: string) => void }) {
+function MaterialRows({ job, draft, onReject, onEdit }: { job: JobDetailDto; draft: Draft; onReject: (key: string) => void; onEdit?: (t: EditTarget) => void }) {
   const ops = new Map<string, LineOp>(draft.pending.lineOps.map((o) => [o.lineId, o]));
   const committed = job.lines.filter((l) => l.groupKey === 'materials');
   const creates = draft.pending.lineOps.filter((o) => o.op === 'create');
@@ -88,6 +92,8 @@ function MaterialRows({ job, draft, onReject }: { job: JobDetailDto; draft: Draf
             badge={op?.op === 'delete' ? 'Remove' : undefined}
             changedAt={op ? draft.changedAt[opKey(op)] : undefined}
             onReject={op ? () => onReject(opKey(op)) : undefined}
+            onPress={onEdit ? () => onEdit({ kind: 'line', lineId: l.id }) : undefined}
+            editLabel={`Edit ${String(values.material ?? 'material')}`}
           />
         );
       })}
@@ -105,18 +111,26 @@ function MaterialRows({ job, draft, onReject }: { job: JobDetailDto; draft: Draf
             badge={missing.length ? `Needs ${missing[0]}` : 'New'}
             changedAt={draft.changedAt[opKey(op)]}
             onReject={() => onReject(opKey(op))}
+            onPress={onEdit ? () => onEdit({ kind: 'line', lineId: op.lineId }) : undefined}
+            editLabel={`Edit ${String(v.material ?? 'material')}`}
           />
         );
       })}
       {draft.ghosts.map((g) => (
         <ProposalRow key={`ghost-${g.key}`} tall kind="ghost" label={titleCase(g.op.values?.material)} sublabel={lineSub(g.op.values ?? {})} badge="Dropped" />
       ))}
+      {onEdit ? (
+        <Pressable accessibilityRole="button" onPress={() => onEdit({ kind: 'line' })} style={({ pressed }) => [styles.add, pressed && { opacity: 0.6 }]}>
+          <Icon name="plus" size={18} color={colors.textMuted} />
+          <T style={{ color: colors.textMuted, fontSize: 15 }}>Add material</T>
+        </Pressable>
+      ) : null}
     </Card>
   );
 }
 
 /** The form body: Appliance, Measurements, Materials used, Conclusion, Job. */
-export function FormSections({ job, draft, onReject }: { job: JobDetailDto; draft: Draft; onReject: (key: string) => void }) {
+export function FormSections({ job, draft, onReject, onEdit }: { job: JobDetailDto; draft: Draft; onReject: (key: string) => void; onEdit?: (t: EditTarget) => void }) {
   const value = (key: string) => {
     const op = draft.pending.fieldOps.find((o) => o.fieldKey === key);
     return op ? (op.op === 'set' ? op.value : undefined) : job.values[key];
@@ -146,12 +160,12 @@ export function FormSections({ job, draft, onReject }: { job: JobDetailDto; draf
             }
           />
         );
-        const rows = <FieldRows key={s.key} section={s.key} job={job} draft={draft} onReject={onReject} />;
+        const rows = <FieldRows key={s.key} section={s.key} job={job} draft={draft} onReject={onReject} onEdit={onEdit} />;
         // Materials sit between Measurements and Conclusion.
         if (s.key === 'conclusion') {
           return [
             <SectionHeader key="h-materials" title={LINE_GROUPS[0]!.label} right={String(Math.max(0, materialCount))} />,
-            <MaterialRows key="materials" job={job} draft={draft} onReject={onReject} />,
+            <MaterialRows key="materials" job={job} draft={draft} onReject={onReject} onEdit={onEdit} />,
             header,
             rows,
           ];
@@ -164,4 +178,5 @@ export function FormSections({ job, draft, onReject }: { job: JobDetailDto; draf
 
 const styles = StyleSheet.create({
   empty: { paddingHorizontal: 12, paddingVertical: 12, gap: 2 },
+  add: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 46, paddingHorizontal: 12, borderTopWidth: 1, borderTopColor: colors.divider },
 });

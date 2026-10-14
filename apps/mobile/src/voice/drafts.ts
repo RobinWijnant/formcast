@@ -20,11 +20,15 @@ export interface Draft {
 
 const EMPTY_DRAFT: Draft = { pending: EMPTY_PROPOSALS, changedAt: {}, ghosts: [] };
 const GHOST_MS = 1200;
+/** changedAt for hand edits: far in the past, so the row shows as filled right away. */
+const MANUAL = 1;
 
 interface DraftsState {
   drafts: Record<string, Draft>;
   apply: (jobId: string, set: ProposalSet, changed: string[], removed: string[]) => void;
   remove: (jobId: string, key: string) => void;
+  /** A change made by hand: lands as already filled (no countdown). */
+  put: (jobId: string, op: FieldOp | LineOp) => void;
   clear: (jobId: string) => void;
 }
 
@@ -66,6 +70,22 @@ export const useDrafts = create<DraftsState>((set) => ({
         drafts: {
           ...s.drafts,
           [jobId]: { ...prev, changedAt, pending: { fieldOps: prev.pending.fieldOps.filter(keep), lineOps: prev.pending.lineOps.filter(keep) } },
+        },
+      };
+    });
+  },
+  put(jobId, op) {
+    set((s) => {
+      const prev = s.drafts[jobId] ?? EMPTY_DRAFT;
+      const key = opKey(op);
+      const fieldOps = prev.pending.fieldOps.filter((o) => opKey(o) !== key);
+      const lineOps = prev.pending.lineOps.filter((o) => opKey(o) !== key);
+      if ('fieldKey' in op) fieldOps.push(op);
+      else lineOps.push(op);
+      return {
+        drafts: {
+          ...s.drafts,
+          [jobId]: { ...prev, pending: { fieldOps, lineOps }, changedAt: { ...prev.changedAt, [key]: MANUAL } },
         },
       };
     });

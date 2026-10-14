@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 import { FIELD_BY_KEY, formatValue, type JobDetailDto } from '@formcast/shared';
 import { usePrefs } from '@/lib/prefs';
 import { colors, fonts } from '@/lib/theme';
@@ -23,7 +23,7 @@ export function useHeard(changedAt: number | undefined) {
 }
 
 /** Priority and tags in the job header; both can be changed by voice. */
-export function HeaderMeta({ job, draft, onReject }: { job: JobDetailDto; draft?: Draft; onReject?: (key: string) => void }) {
+export function HeaderMeta({ job, draft, onReject, onEdit }: { job: JobDetailDto; draft?: Draft; onReject?: (key: string) => void; onEdit?: (fieldKey: 'priority' | 'tags') => void }) {
   const delay = usePrefs((s) => s.fillDelayMs);
   const pOp = draft?.pending.fieldOps.find((o) => o.fieldKey === 'priority');
   const tOp = draft?.pending.fieldOps.find((o) => o.fieldKey === 'tags');
@@ -34,22 +34,36 @@ export function HeaderMeta({ job, draft, onReject }: { job: JobDetailDto; draft?
   const committedTags = (job.values.tags as string[] | undefined) ?? job.tags;
   const tags = tOp ? (tOp.op === 'set' ? (tOp.value as string[]) : []) : committedTags;
   const removedTags = tOp ? committedTags.filter((t) => !tags.includes(t)) : [];
-  const tagLabel = (t: string) => formatValue(FIELD_BY_KEY.get('tags')!, [t]).toLowerCase();
+  const tagLabel = (t: string) => t;
 
   return (
     <View style={styles.meta}>
-      <View style={[styles.pill, priority === 'high' && styles.high, pHeard && styles.heard]}>
+      <Pressable
+        disabled={!onEdit}
+        onPress={() => onEdit?.('priority')}
+        accessibilityRole={onEdit ? 'button' : undefined}
+        accessibilityLabel={onEdit ? 'Edit priority' : undefined}
+        style={[styles.pill, priority === 'high' && styles.high, pHeard && styles.heard]}
+      >
         <T style={[styles.pillText, priority === 'high' && { color: '#8F2416' }, pHeard && { color: colors.amberText }]}>
           Priority · {formatValue(FIELD_BY_KEY.get('priority')!, priority)}
         </T>
         {pOp && !pHeard ? <Icon name="check" size={15} color={colors.green} strokeWidth={2.25} /> : null}
-      </View>
+      </Pressable>
       {pHeard && onReject ? <CountdownRing startedAt={draft!.changedAt['field:priority']!} duration={delay} onReject={() => onReject('field:priority')} label="Reject priority change" /> : null}
 
-      {tags.map((t) => (
-        <View key={t} style={[styles.pill, tHeard && styles.heard]}>
+      {tags.map((t, i) => (
+        <Pressable
+          key={t}
+          disabled={!onEdit}
+          onPress={() => onEdit?.('tags')}
+          accessibilityRole={onEdit ? 'button' : undefined}
+          accessibilityLabel={onEdit ? 'Edit tags' : undefined}
+          style={[styles.pill, tHeard && styles.heard]}
+        >
           <T style={[styles.pillText, tHeard && { color: colors.amberText }]}>{tagLabel(t)}</T>
-        </View>
+          {tOp && !tHeard && i === tags.length - 1 ? <Icon name="check" size={15} color={colors.green} strokeWidth={2.25} /> : null}
+        </Pressable>
       ))}
       {tHeard
         ? removedTags.map((t) => (
@@ -59,11 +73,15 @@ export function HeaderMeta({ job, draft, onReject }: { job: JobDetailDto; draft?
           ))
         : null}
       {!tags.length && !removedTags.length ? (
-        <View style={[styles.pill, styles.muted]}>
-          <T style={[styles.pillText, { color: colors.textFaint, fontFamily: fonts.regular }]}>No tags</T>
-        </View>
+        <Pressable
+          disabled={!onEdit}
+          onPress={() => onEdit?.('tags')}
+          accessibilityRole={onEdit ? 'button' : undefined}
+          style={[styles.pill, styles.muted]}
+        >
+          <T style={[styles.pillText, { color: colors.textFaint, fontFamily: fonts.regular }]}>{onEdit ? '+ Add tags' : 'No tags'}</T>
+        </Pressable>
       ) : null}
-      {tOp && !tHeard && tags.length ? <Icon name="check" size={15} color={colors.green} strokeWidth={2.25} /> : null}
       {tHeard && onReject ? <CountdownRing startedAt={draft!.changedAt['field:tags']!} duration={delay} onReject={() => onReject('field:tags')} label="Reject tags change" /> : null}
     </View>
   );

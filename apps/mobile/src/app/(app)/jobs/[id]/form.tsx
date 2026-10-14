@@ -4,6 +4,7 @@ import { router, useLocalSearchParams, useNavigation } from 'expo-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Dock, DockError } from '@/components/Dock';
+import { EditSheet, type EditTarget } from '@/components/EditSheet';
 import { FormSections } from '@/components/FormSections';
 import { HeaderMeta } from '@/components/HeaderMeta';
 import { Icon } from '@/components/Icon';
@@ -25,6 +26,7 @@ export default function JobForm() {
   const voice = useVoiceSession(id);
   const showTranscript = usePrefs((s) => s.showTranscript);
   const [leaveOpen, setLeaveOpen] = useState(false);
+  const [editing, setEditing] = useState<EditTarget | null>(null);
   const [savedAt, setSavedAt] = useState<number | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
   const leaving = useRef(false);
@@ -105,6 +107,8 @@ export default function JobForm() {
   }
   const j = job.data;
   const recording = voice.active;
+  // Hand edits only while not talking, so speech and fingers don't overwrite each other.
+  const onEdit = recording ? undefined : (t: EditTarget) => setEditing(t);
   const saved = !dirty && savedAt !== null;
 
   return (
@@ -160,7 +164,7 @@ export default function JobForm() {
             <T style={styles.eyebrow}>{j.code} · TODAY</T>
             <T style={styles.h1}>{j.title}</T>
             <T style={styles.client}>{j.client.name}</T>
-            <HeaderMeta job={j} draft={draft} onReject={voice.reject} />
+            <HeaderMeta job={j} draft={draft} onReject={voice.reject} onEdit={onEdit && ((fieldKey) => onEdit({ kind: 'field', fieldKey }))} />
           </View>
         ) : (
           <View style={{ paddingHorizontal: 28 }}>
@@ -168,7 +172,7 @@ export default function JobForm() {
           </View>
         )}
         {saveError ? <T style={styles.saveError}>{saveError}</T> : null}
-        <FormSections job={j} draft={draft} onReject={voice.reject} />
+        <FormSections job={j} draft={draft} onReject={voice.reject} onEdit={onEdit} />
         </View>
         </RowRegistry.Provider>
       </ScrollView>
@@ -197,10 +201,12 @@ export default function JobForm() {
         <Dock state={voice.state} transcript={voice.transcript} showTranscript={showTranscript} levels={voice.levels} startedAt={voice.startedAt} onStop={voice.stop} />
       ) : (
         <SafeAreaView edges={['bottom']} style={styles.footer}>
-          <T style={styles.hint}>Talk naturally. Fields fill in as you speak.</T>
+          <T style={styles.hint}>Talk naturally, or tap a field to type.</T>
           <Button title="Start speaking" icon="mic" variant="amber" big onPress={() => void voice.start()} style={styles.mic} />
         </SafeAreaView>
       )}
+
+      <EditSheet target={editing} job={j} draft={draft} jobId={id} onClose={() => setEditing(null)} />
 
       <Sheet
         visible={leaveOpen}

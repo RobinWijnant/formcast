@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 import { useRowRegistry } from './rowRegistry';
 import * as Haptics from 'expo-haptics';
 import Animated, { Easing, useAnimatedStyle, useSharedValue, withDelay, withSequence, withTiming } from 'react-native-reanimated';
@@ -36,7 +36,12 @@ export function ProposalRow({
   onReject,
   tall,
   rowKey,
+  onPress,
+  editLabel,
 }: {
+  /** Tap to edit by hand. */
+  onPress?: () => void;
+  editLabel?: string;
   rowKey?: string;
   kind: RowKind;
   label: ReactNode;
@@ -110,11 +115,16 @@ export function ProposalRow({
   const showCheck = timed && phase !== 'heard';
 
   return (
-    <View
+    <Pressable
       collapsable={false}
+      disabled={!onPress}
+      onPress={onPress}
+      accessibilityRole={onPress ? 'button' : undefined}
+      accessibilityLabel={onPress ? editLabel : undefined}
+      style={({ pressed }) => (pressed && onPress ? { opacity: 0.6 } : null)}
       ref={(node) => {
         if (!rowKey || !registry) return;
-        if (node) registry.set(rowKey, node);
+        if (node) registry.set(rowKey, node as unknown as View);
         else registry.delete(rowKey);
       }}
     >
@@ -147,7 +157,7 @@ export function ProposalRow({
       {heard && onReject ? <CountdownRing startedAt={changedAt} duration={delay} onReject={onReject} label="Reject this change" /> : null}
       {showCheck ? <Icon name="check" size={18} color={colors.green} strokeWidth={2} /> : null}
     </Animated.View>
-    </View>
+    </Pressable>
   );
 }
 
