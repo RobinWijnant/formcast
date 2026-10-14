@@ -256,7 +256,7 @@ const styles = StyleSheet.create({
   scrim: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(22,24,26,0.48)' },
   wrap: { flex: 1, justifyContent: 'flex-end' },
   sheet: { backgroundColor: colors.surface, borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingTop: 10, paddingHorizontal: 20, gap: 14, maxHeight: '85%' },
-  underlay: { position: 'absolute', left: 0, right: 0, top: '100%', height: 64, backgroundColor: colors.surface },
+  underlay: { position: 'absolute', left: 0, right: 0, top: '100%', height: 400, backgroundColor: colors.surface },
   handle: { alignSelf: 'center', width: 40, height: 5, borderRadius: 3, backgroundColor: '#D5D8D3' },
   title: { fontFamily: fonts.semibold, fontSize: 22, letterSpacing: -0.4 },
   label: { fontFamily: fonts.medium, fontSize: 13, color: colors.text },
