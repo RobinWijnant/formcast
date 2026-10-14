@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { Keyboard, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   FIELD_BY_KEY,
@@ -221,6 +221,15 @@ export function EditSheet({ target, job, draft, jobId, onClose }: { target: Edit
   useEffect(() => {
     if (target) setShown(target);
   }, [target]);
+  const [keyboard, setKeyboard] = useState(false);
+  useEffect(() => {
+    const show = Keyboard.addListener(Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow', () => setKeyboard(true));
+    const hide = Keyboard.addListener(Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide', () => setKeyboard(false));
+    return () => {
+      show.remove();
+      hide.remove();
+    };
+  }, []);
   if (!shown) return null;
 
   const title =
@@ -234,7 +243,7 @@ export function EditSheet({ target, job, draft, jobId, onClose }: { target: Edit
     <Modal visible={!!target} transparent animationType="fade" onRequestClose={onClose} onDismiss={() => setShown(null)}>
       <Pressable style={styles.scrim} onPress={onClose} accessibilityLabel="Close" />
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.wrap} pointerEvents="box-none">
-        <View style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, 16) + 12 }]}>
+        <View style={[styles.sheet, { paddingBottom: keyboard ? 14 : Math.max(insets.bottom, 16) + 12 }]}>
           {/* Extends the sheet under the keyboard's rounded top corners. */}
           <View pointerEvents="none" style={styles.underlay} />
           <View style={styles.handle} />
