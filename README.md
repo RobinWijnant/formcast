@@ -79,7 +79,8 @@ pnpm --filter @formcast/api e2e:voice       # macOS `say` → PCM → WebSocket 
 
 ## Known limitations
 
-- Real microphone capture is only verified via the native `expo-audio` stream API on paper; end-to-end runs used recorded speech (`say`) and the web build. Test on the iOS Simulator/device before the demo.
+- Verified on the iOS 27 Simulator with the real (Mac) microphone; not yet on a physical iPhone.
+- iOS 27 requires the UIScene life cycle; Expo SDK 57's template doesn't adopt it yet, so `apps/mobile/plugins/withSceneLifecycle.js` wires up Expo's `ExpoAppSceneDelegate`.
 - Unsaved proposals live in memory: killing the app loses them.
 - One technician, no tenancy; every signed-in user sees every job.
 - Travel time on the Today screen is the gap between jobs, not a real route ETA; the map tile ETA is static.
