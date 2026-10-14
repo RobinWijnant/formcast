@@ -80,7 +80,8 @@ function FieldEditor({ def, job, draft, jobId, onDone }: { def: FieldDef; job: J
           setError(null);
         }}
         autoFocus
-        returnKeyType={props.multiline ? 'default' : 'done'}
+        // A return key type on a number pad makes RN add its own floating Done bar; the sheet already has one.
+        returnKeyType={props.multiline || props.keyboardType === 'decimal-pad' ? undefined : 'done'}
         onSubmitEditing={props.multiline ? undefined : save}
         {...props}
       />

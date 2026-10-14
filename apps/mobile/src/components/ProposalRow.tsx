@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { useRowRegistry } from './rowRegistry';
 import * as Haptics from 'expo-haptics';
 import Animated, { Easing, useAnimatedStyle, useSharedValue, withDelay, withSequence, withTiming } from 'react-native-reanimated';
+import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
 import { usePrefs } from '@/lib/prefs';
 import { colors, fonts, radius } from '@/lib/theme';
 import { CountdownRing } from './CountdownRing';
@@ -24,6 +25,7 @@ export type RowKind = 'committed' | 'pending' | 'incomplete' | 'removing' | 'gho
 type Phase = 'heard' | 'flash' | 'filled';
 
 const FLASH_HOLD_MS = 1000;
+const SHINE_WIDTH = 110;
 
 export function ProposalRow({
   kind,
@@ -64,6 +66,8 @@ export function ProposalRow({
   const sweep = useSharedValue(phase === 'filled' ? 1 : 0);
   const flash = useSharedValue(0);
   const scale = useSharedValue(1);
+  const shine = useSharedValue(0);
+  const rowWidth = useSharedValue(0);
   const ghost = useSharedValue(1);
 
   useEffect(() => {
@@ -79,32 +83,43 @@ export function ProposalRow({
     setPhase('heard');
     sweep.value = 0;
     flash.value = 0;
-    const timer = setTimeout(() => {
-      setPhase('flash');
-      if (vibrate) void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => undefined);
-      // Green sweeps in with the check, the card pops like a stamp, holds, fades.
-      sweep.value = withTiming(1, { duration: 120, easing: Easing.out(Easing.cubic) });
-      flash.value = withSequence(withTiming(1, { duration: 120 }), withDelay(FLASH_HOLD_MS, withTiming(0, { duration: 400 })));
-      scale.value = withSequence(
-        withTiming(1.05, { duration: 110, easing: Easing.out(Easing.quad) }),
-        withTiming(0.985, { duration: 110 }),
-        withTiming(1, { duration: 140 }),
-      );
-    }, wait);
-    const done = setTimeout(() => setPhase('filled'), wait + 120 + FLASH_HOLD_MS + 400);
-    return () => {
-      clearTimeout(timer);
-      clearTimeout(done);
-    };
+    shine.value = 0;
+    const timer = setTimeout(() => setPhase('flash'), wait);
+    return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [timed, settleAt]);
+
+  // Runs once the row has re-rendered without its amber look, so the green
+  // never sweeps in under the dashed border and ring.
+  useEffect(() => {
+    if (phase !== 'flash') return;
+    if (vibrate) void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => undefined);
+    // Green sweeps in with the check, the card pops like a stamp while a sheen
+    // passes left to right, then it holds and fades.
+    sweep.value = withTiming(1, { duration: 140, easing: Easing.out(Easing.cubic) });
+    shine.value = withDelay(80, withTiming(1, { duration: 600, easing: Easing.inOut(Easing.quad) }));
+    flash.value = withSequence(withTiming(1, { duration: 140 }), withDelay(FLASH_HOLD_MS, withTiming(0, { duration: 400 })));
+    scale.value = withSequence(
+      withTiming(1.04, { duration: 120, easing: Easing.out(Easing.quad) }),
+      withTiming(0.99, { duration: 120, easing: Easing.inOut(Easing.quad) }),
+      withTiming(1, { duration: 160, easing: Easing.out(Easing.quad) }),
+    );
+    const done = setTimeout(() => setPhase('filled'), 140 + FLASH_HOLD_MS + 400);
+    return () => clearTimeout(done);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase]);
 
   useEffect(() => {
     if (kind === 'ghost') ghost.value = withTiming(0, { duration: 1100 });
   }, [kind, ghost]);
 
   const containerStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }], opacity: kind === 'ghost' ? 0.15 + ghost.value * 0.45 : 1 }));
-  const overlayStyle = useAnimatedStyle(() => ({ width: `${sweep.value * 100}%`, opacity: flash.value }));
+  // Slid in rather than sized: a % width fell short of the right edge on iOS.
+  const overlayStyle = useAnimatedStyle(() => ({ opacity: flash.value, transform: [{ translateX: (sweep.value - 1) * rowWidth.value }] }));
+  const shineStyle = useAnimatedStyle(() => ({
+    opacity: shine.value > 0 && shine.value < 1 ? 1 : 0,
+    transform: [{ translateX: -SHINE_WIDTH + shine.value * (rowWidth.value + SHINE_WIDTH) }, { skewX: '-20deg' }],
+  }));
 
   const heard = phase === 'heard' && timed;
   const removing = kind === 'removing';
@@ -137,8 +152,23 @@ export function ProposalRow({
         phase === 'flash' && styles.flash,
         containerStyle,
       ]}
+      onLayout={(e) => (rowWidth.value = e.nativeEvent.layout.width)}
     >
       <Animated.View pointerEvents="none" style={[styles.overlay, overlayStyle]} />
+      {phase === 'flash' ? (
+        <Animated.View pointerEvents="none" style={[styles.shine, shineStyle]}>
+          <Svg width={SHINE_WIDTH} height="100%">
+            <Defs>
+              <LinearGradient id="shine" x1="0" y1="0" x2="1" y2="0">
+                <Stop offset="0" stopColor="#FFFFFF" stopOpacity={0} />
+                <Stop offset="0.5" stopColor="#FFFFFF" stopOpacity={0.85} />
+                <Stop offset="1" stopColor="#FFFFFF" stopOpacity={0} />
+              </LinearGradient>
+            </Defs>
+            <Rect width="100%" height="100%" fill="url(#shine)" />
+          </Svg>
+        </Animated.View>
+      ) : null}
       <View style={styles.labels}>
         <T style={[styles.label, { color: textColor }, struck && styles.struck]}>{label}</T>
         {sublabel ? <T style={[styles.sublabel, { color: tone ? textColor : colors.textMuted }, struck && styles.struck]}>{sublabel}</T> : null}
@@ -178,7 +208,8 @@ const styles = StyleSheet.create({
   amber: { backgroundColor: colors.amberFill, borderColor: colors.amberBorder },
   red: { backgroundColor: colors.redFill, borderColor: colors.redBorder },
   flash: { borderStyle: 'solid', borderColor: colors.greenBorder },
-  overlay: { position: 'absolute', left: 0, top: 0, bottom: 0, backgroundColor: colors.greenFill },
+  overlay: { ...StyleSheet.absoluteFill, backgroundColor: colors.greenFill },
+  shine: { position: 'absolute', left: 0, top: -8, bottom: -8, width: SHINE_WIDTH },
   labels: { flex: 1, gap: 2 },
   label: { fontSize: 15 },
   sublabel: { fontFamily: fonts.mono, fontSize: 13 },
