@@ -20,7 +20,7 @@ Goal: while the technician talks, the screen always answers one question:
 
 Based on the Flemish maintenance certificate for central heating boilers. Firm, technician and distance travelled live on later screens and are out of this form.
 
-**Job context header** (prefilled from the job): job id, job name, client name, priority (low/medium/high), tags (urgent, warranty, follow-up, parts-needed). Priority and tags stay voice-editable so the brief's demo script works ("Set priority to high", "Tag this as warranty…").
+**Job context header** (prefilled from the job): job id, job name, client name, priority (low/medium/high), tags (warranty, follow-up, parts-needed; urgency is expressed by priority only). Priority and tags stay voice-editable so the brief's demo script works ("Set priority to high", "Tag this as warranty…").
 
 | Section | Field | Type |
 |---|---|---|

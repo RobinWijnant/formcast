@@ -41,7 +41,7 @@ const opts = (...values: string[]): Option[] =>
 
 export const FIELDS: FieldDef[] = [
   { key: 'priority', label: 'Priority', section: 'header', type: 'select', options: opts('low', 'medium', 'high'), hint: 'Urgency of the job or its follow-up.' },
-  { key: 'tags', label: 'Tags', section: 'header', type: 'multiselect', options: opts('urgent', 'warranty', 'follow-up', 'parts-needed'), hint: 'Labels on the job.' },
+  { key: 'tags', label: 'Tags', section: 'header', type: 'multiselect', options: opts('warranty', 'follow-up', 'parts-needed'), hint: 'Labels on the job. Urgency is not a tag: "urgent" means priority high.' },
 
   { key: 'brand', label: 'Brand', section: 'appliance', type: 'text', hint: 'Boiler manufacturer, e.g. Vaillant, Viessmann, Bosch.' },
   { key: 'model', label: 'Model', section: 'appliance', type: 'text', hint: 'Boiler model name.' },
