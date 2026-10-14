@@ -11,3 +11,5 @@ android/
 .DS_Store
 coverage/
 apps/api/test/fixtures/*.wav
+!apps/mobile/.env
+.claude/

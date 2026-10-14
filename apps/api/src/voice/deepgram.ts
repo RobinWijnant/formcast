@@ -17,12 +17,12 @@ interface DeepgramResult {
   channel?: { alternatives?: { transcript?: string }[] };
 }
 
-export function openDeepgram(events: SttEvents) {
+export function openDeepgram(events: SttEvents, sampleRate = AUDIO_SAMPLE_RATE) {
   const params = new URLSearchParams({
     model: 'nova-3',
     language: 'en',
     encoding: 'linear16',
-    sample_rate: String(AUDIO_SAMPLE_RATE),
+    sample_rate: String(Math.round(sampleRate)),
     channels: '1',
     interim_results: 'true',
     punctuate: 'true',

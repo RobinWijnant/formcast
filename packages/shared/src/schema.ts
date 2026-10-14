@@ -76,7 +76,7 @@ export const LINE_GROUPS: LineGroupDef[] = [
     columns: [
       { key: 'material', label: 'Material', type: 'text', required: true },
       { key: 'quantity', label: 'Quantity', type: 'number', required: true },
-      { key: 'unit', label: 'Unit', type: 'select', required: true, options: opts('pcs', 'm', 'l', 'kg') },
+      { key: 'unit', label: 'Unit', type: 'select', required: true, options: ['pcs', 'm', 'l', 'kg'].map((u) => ({ value: u, label: u })) },
     ],
   },
 ];

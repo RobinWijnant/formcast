@@ -41,6 +41,17 @@ export function createVoiceSession(job: JobDetailDto, send: (msg: ServerMessage)
     if (changed.length || removed.length) send({ type: 'proposals', seq: ++seq, set: pending, changed, removed });
   };
 
+  // A "change" to the value that is already saved is no change: drop it.
+  const committedLines = new Map(job.lines.map((l) => [l.id, l.values]));
+  const withoutNoops = (set: ProposalSet): ProposalSet => ({
+    fieldOps: set.fieldOps.filter((o) =>
+      o.op === 'set' ? JSON.stringify(o.value) !== JSON.stringify(job.values[o.fieldKey]) : job.values[o.fieldKey] !== undefined,
+    ),
+    lineOps: set.lineOps.filter(
+      (o) => o.op !== 'update' || Object.entries(o.values ?? {}).some(([k, v]) => committedLines.get(o.lineId)?.[k] !== v),
+    ),
+  });
+
   // A tapped-away proposal stays away until the technician says something different.
   const withoutRejected = (set: ProposalSet): ProposalSet => {
     const keep = (op: ProposalSet['fieldOps'][number] | ProposalSet['lineOps'][number]) => rejected.get(opKey(op)) !== JSON.stringify(op);
@@ -60,7 +71,7 @@ export function createVoiceSession(job: JobDetailDto, send: (msg: ServerMessage)
       processedSegments = upTo;
       if (dropped.length) console.warn('[engine] dropped ops:', dropped.join('; '));
       console.log(`[engine] ${ms} ms, ${set.fieldOps.length} field ops, ${set.lineOps.length} line ops`);
-      publish(withoutRejected(set));
+      publish(withoutRejected(withoutNoops(set)));
     } catch (err) {
       console.error('[engine]', err);
       if (!stopping) send({ type: 'status', state: 'listening' });
@@ -95,7 +106,8 @@ export function createVoiceSession(job: JobDetailDto, send: (msg: ServerMessage)
     timer = setTimeout(trigger, DEBOUNCE_MS);
   }
 
-  const stt = openDeepgram({
+  let stt: ReturnType<typeof openDeepgram> | undefined;
+  const openStt = (sampleRate?: number) => (stt ??= openDeepgram({
     onInterim: (interim) => send({ type: 'transcript', final: transcript.join(' '), interim }),
     onFinal: (text) => {
       transcript.push(text);
@@ -104,7 +116,7 @@ export function createVoiceSession(job: JobDetailDto, send: (msg: ServerMessage)
     },
     onError: (message) => send({ type: 'error', code: 'stt', message }),
     onClose: () => void finish(),
-  });
+  }, sampleRate));
 
   async function finish() {
     if (finished) return;
@@ -121,13 +133,14 @@ export function createVoiceSession(job: JobDetailDto, send: (msg: ServerMessage)
 
   return {
     onAudio(chunk: ArrayBuffer) {
-      if (!stopping) stt.send(chunk);
+      if (!stopping) openStt().send(chunk);
     },
     onMessage(msg: ClientMessage) {
       switch (msg.type) {
         case 'init': {
           // Unsaved changes from an earlier session on this job.
           pending = normalizeProposalSet(msg.pending, { committedLineIds }).set;
+          openStt(msg.sampleRate && msg.sampleRate >= 8000 && msg.sampleRate <= 48000 ? msg.sampleRate : undefined);
           break;
         }
         case 'reject': {
@@ -140,7 +153,8 @@ export function createVoiceSession(job: JobDetailDto, send: (msg: ServerMessage)
         case 'stop':
           stopping = true;
           send({ type: 'status', state: 'stopping' });
-          stt.finish();
+          if (stt) stt.finish();
+          else void finish();
           // Deepgram normally closes within a second; don't wait forever.
           setTimeout(() => void finish(), 4000);
           break;
@@ -150,7 +164,7 @@ export function createVoiceSession(job: JobDetailDto, send: (msg: ServerMessage)
       stopping = true;
       finished = true;
       clearTimeout(timer);
-      stt.abort();
+      stt?.abort();
     },
   };
 }

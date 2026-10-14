@@ -24,11 +24,11 @@ Neon Postgres (Drizzle ORM) + Neon Auth (Managed Better Auth)
 | Mobile | Expo (dev build, not Expo Go), Expo Router, TypeScript | Required by the brief; a dev build is needed for native audio streaming |
 | Mobile UI | Reanimated (sweep/pop/countdown), `expo-blur` (glass phone tile), `react-native-maps` | Matches the designs |
 | Mobile state | Zustand for the live session/proposal store, TanStack Query for REST | Proposal layer stays separate from committed server state |
-| Mic capture | `@siteed/expo-audio-studio` (PCM chunks every ~100 ms) | `expo-audio` records files only; we need a live stream |
+| Mic capture | `expo-audio` `useAudioStream` (16-bit PCM, 16 kHz requested, actual rate sent to the API) | Built into SDK 57, works on iOS and web, no extra native module |
 | Transport | One WebSocket per speaking session: binary audio up, JSON events down (`transcript.partial`, `proposals.snapshot`, `status`) | Full-duplex, one connection, easy reconnect |
 | API | Hono on **Neon Functions** (WebSocket support via `upgradeWebSocket`) | Same branch as the DB; Neon injects auth/JWKS env vars. Fallback: same Hono app on Node (Fly/Render) if a runtime limit bites |
 | STT | Deepgram streaming (`nova` family, `nl`/`en`, interim results, endpointing) | Mature streaming API with Dutch; ElevenLabs Scribe realtime is the drop-in alternative the brief mentions |
-| LLM | Claude via `@anthropic-ai/sdk`, model `claude-opus-5-5`, `effort: "low"`, structured outputs (`output_config.format` with a JSON schema of ops), prompt caching on the system prompt + form schema | Reliable structured ops and revision handling ("scrap that", "make that 15") |
+| LLM | Gemini via `@google/genai`, `gemini-3.1-flash-lite` (minimal thinking, temperature 0, `responseJsonSchema`), hedged with `gemini-3.5-flash-lite` | ~1–2 s per update, passes the full demo replay; free-tier quota is budgeted per model |
 | DB | Neon Postgres + Drizzle ORM / drizzle-kit migrations, Neon branches for dev | Real DB as required; branching gives a throwaway DB per PR/demo |
 | Auth | **Neon Auth** (Managed Better Auth), email + password, JWT plugin | Requested; see the caveat below |
 | Validation | Zod everywhere: op payloads from the LLM are validated before they reach the store | An invalid op is dropped, never applied |

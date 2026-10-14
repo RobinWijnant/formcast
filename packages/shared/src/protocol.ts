@@ -5,7 +5,8 @@ export const AUDIO_SAMPLE_RATE = 16000;
 
 // App -> API over the session WebSocket (audio frames are sent as binary).
 export type ClientMessage =
-  | { type: 'init'; pending: ProposalSet }
+  /** First message: unsaved changes from earlier and the actual mic sample rate. */
+  | { type: 'init'; pending: ProposalSet; sampleRate?: number }
   | { type: 'reject'; key: string }
   | { type: 'stop' };
 

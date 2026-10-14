@@ -1,0 +1,45 @@
+{
+  "expo": {
+    "name": "Formcast",
+    "slug": "formcast",
+    "scheme": "formcast",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.robinwijnant.formcast"
+    },
+    "android": {
+      "package": "com.robinwijnant.formcast",
+      "adaptiveIcon": {
+        "backgroundColor": "#F2F3EF",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "bundler": "metro",
+      "favicon": "./assets/favicon.png"
+    },
+    "experiments": {
+      "typedRoutes": true
+    },
+    "plugins": [
+      "expo-router",
+      "expo-status-bar",
+      [
+        "expo-audio",
+        {
+          "microphonePermission": "Formcast listens while you tap Start speaking, to fill in the job report."
+        }
+      ],
+      "expo-secure-store",
+      "expo-font",
+      "expo-asset"
+    ]
+  }
+}
