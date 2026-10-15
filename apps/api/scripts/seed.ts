@@ -57,7 +57,29 @@ const jobs: SeedJob[] = [
   // Coming days
   { code: 'JOB-1045', client: 'peeters', title: 'Thermostat replacement', description: 'Replace the room thermostat.', day: 1, start: '09:00', end: '10:00', status: 'scheduled', priority: 'medium', tags: ['parts-needed'] },
   { code: 'JOB-1046', client: 'janssens', title: 'Boiler repair follow-up', description: 'Check the ignition after the repair.', day: 2, start: '11:00', end: '11:45', status: 'scheduled', priority: 'medium', tags: ['follow-up'] },
+  ...wednesdayJobs(),
 ];
+
+/** Two visits every Wednesday in the next 30 days, so the week strip has jobs further out. */
+function wednesdayJobs(): SeedJob[] {
+  const visits = [
+    { client: 'desmet', title: 'Boiler maintenance', description: 'Yearly maintenance of the gas boiler.', start: '09:00', end: '10:30', priority: 'low', tags: [] },
+    { client: 'janssens', title: 'Radiator bleeding', description: 'Radiators upstairs stay cold. Bleed them and check the pressure.', start: '13:30', end: '14:30', priority: 'medium', tags: [] },
+    { client: 'vandamme', title: 'Pressure check', description: 'Follow-up on the pressure drops after the valve replacement.', start: '09:30', end: '10:15', priority: 'medium', tags: ['follow-up'] },
+    { client: 'peeters', title: 'Flue inspection', description: 'Inspect and clean the flue before winter.', start: '14:00', end: '15:00', priority: 'low', tags: [] },
+  ];
+  const brusselsWeekday = new Date(new Date().toLocaleString('en-US', { timeZone: 'Europe/Brussels' })).getDay();
+  const wednesdays = Array.from({ length: 30 }, (_, i) => i + 1).filter((day) => (brusselsWeekday + day) % 7 === 3);
+
+  return wednesdays.flatMap((day, week) =>
+    [visits[(week * 2) % visits.length]!, visits[(week * 2 + 1) % visits.length]!].map((visit, i) => ({
+      ...visit,
+      code: `JOB-${1050 + week * 2 + i}`,
+      day,
+      status: 'scheduled' as const,
+    })),
+  );
+}
 
 async function main() {
   await ensureDemoUser();
