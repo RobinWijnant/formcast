@@ -21,10 +21,6 @@
       },
       "predictiveBackGestureEnabled": false
     },
-    "web": {
-      "bundler": "metro",
-      "favicon": "./assets/favicon.png"
-    },
     "experiments": {
       "typedRoutes": true
     },
@@ -40,7 +36,8 @@
       "expo-secure-store",
       "expo-font",
       "expo-asset",
-      "./plugins/withSceneLifecycle"
+      "./plugins/withSceneLifecycle",
+      "expo-web-browser"
     ]
   }
 }

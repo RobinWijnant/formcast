@@ -14,7 +14,7 @@ const queryClient = new QueryClient({ defaultOptions: { queries: { retry: 1, sta
 export default function RootLayout() {
   const [fontsLoaded] = useFonts({ Geist_400Regular, Geist_500Medium, Geist_600SemiBold, GeistMono_400Regular, GeistMono_500Medium });
   const ready = useAuth((s) => s.ready);
-  const signedIn = useAuth((s) => !!s.token);
+  const signedIn = useAuth((s) => !!s.user);
   const [prefsLoaded, setPrefsLoaded] = useState(false);
 
   useEffect(() => {

@@ -6,7 +6,7 @@ import { getRecordingPermissionsAsync } from 'expo-audio';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Icon } from '@/components/Icon';
 import { IconButton, T } from '@/components/ui';
-import { api } from '@/lib/api';
+import { signOut } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { usePrefs } from '@/lib/prefs';
 import { colors, fonts } from '@/lib/theme';
@@ -56,10 +56,8 @@ export default function Settings() {
     .slice(0, 2)
     .toUpperCase();
 
-  async function signOut() {
-    const { refreshToken, clear } = useAuth.getState();
-    if (refreshToken) await api.signOut(refreshToken).catch(() => undefined);
-    await clear();
+  async function onSignOut() {
+    await signOut();
     router.replace('/sign-in');
   }
 
@@ -122,7 +120,7 @@ export default function Settings() {
           </Row>
         </View>
 
-        <Pressable accessibilityRole="button" onPress={signOut} style={({ pressed }) => [styles.out, pressed && { opacity: 0.7 }]}>
+        <Pressable accessibilityRole="button" onPress={onSignOut} style={({ pressed }) => [styles.out, pressed && { opacity: 0.7 }]}>
           <T style={styles.outText}>Sign out</T>
         </Pressable>
       </ScrollView>

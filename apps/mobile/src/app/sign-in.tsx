@@ -4,8 +4,7 @@ import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Icon } from '@/components/Icon';
 import { Button, T } from '@/components/ui';
-import { api, ApiError } from '@/lib/api';
-import { useAuth } from '@/lib/auth';
+import { ApiError, signIn } from '@/lib/api';
 import { usePrefs } from '@/lib/prefs';
 import { colors, fonts } from '@/lib/theme';
 
@@ -23,8 +22,7 @@ export default function SignIn() {
     setError(null);
     setLoading(true);
     try {
-      const auth = await api.signIn(email.trim(), password);
-      await useAuth.getState().setSession(auth);
+      await signIn(email.trim(), password);
       router.replace(usePrefs.getState().micPrimed ? '/' : '/permission');
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Sign in failed. Try again.');

@@ -29,13 +29,6 @@ export interface UserDto {
   email: string;
 }
 
-export interface AuthResponse {
-  token: string;
-  refreshToken: string;
-  expiresAt: number;
-  user: UserDto;
-}
-
 export interface ClientDto {
   id: string;
   name: string;

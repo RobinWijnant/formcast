@@ -1,5 +1,5 @@
-import type { AuthResponse, CommitBody, JobDetailDto, JobSummaryDto } from '@formcast/shared';
-import { useAuth } from './auth';
+import type { CommitBody, JobDetailDto, JobSummaryDto } from '@formcast/shared';
+import { authClient, useAuth } from './auth';
 
 export const API_URL = (process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:8787').replace(/\/$/, '');
 
@@ -9,57 +9,77 @@ export class ApiError extends Error {
   }
 }
 
-let refreshing: Promise<string> | null = null;
+// Neon Auth origin-checks cookie-bearing POSTs (sign-out). Neon only accepts
+// http(s) trusted domains, so the app identifies as this fixed one.
+const ORIGIN = 'https://formcast.be';
+const OFFLINE = "Can't reach Formcast. Check your connection.";
 
-/** Returns a JWT that is valid for at least another 30 seconds, refreshing if needed. */
-export async function validToken(): Promise<string> {
-  const { token, refreshToken, expiresAt, setSession, clear } = useAuth.getState();
-  if (!token || !refreshToken) throw new ApiError('Sign in required', 401);
-  if (expiresAt - Date.now() > 30_000) return token;
-  refreshing ??= (async () => {
-    try {
-      const res = await fetch(`${API_URL}/v1/auth/refresh`, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ refreshToken }),
-      });
-      if (!res.ok) {
-        await clear();
-        throw new ApiError('Your session expired. Sign in again.', 401);
-      }
-      const auth = (await res.json()) as AuthResponse;
-      await setSession(auth);
-      return auth.token;
-    } finally {
-      refreshing = null;
-    }
-  })();
-  return refreshing;
+export async function signIn(email: string, password: string) {
+  const { data, error } = await authClient.signIn.email({ email, password }).catch(() => {
+    throw new ApiError(OFFLINE, 0);
+  });
+  if (error) throw new ApiError(error.status === 401 ? 'Wrong email or password.' : 'Sign in failed. Try again.', error.status);
+
+  await useAuth.getState().setUser({ id: data.user.id, name: data.user.name, email: data.user.email });
 }
 
-async function request<T>(path: string, init: RequestInit = {}, auth = true): Promise<T> {
+/** Revokes the session when Neon Auth is reachable; the device copy is always dropped. */
+export async function signOut() {
+  await authClient.signOut({ fetchOptions: { headers: { origin: ORIGIN } } }).catch(() => undefined);
+  await useAuth.getState().clear();
+}
+
+let minting: Promise<string> | null = null;
+
+/** Returns a JWT that is valid for at least another 30 seconds, minting one from the session if needed. */
+export async function validToken(): Promise<string> {
+  const { user, token, expiresAt, setToken } = useAuth.getState();
+  if (!user) throw new ApiError('Sign in required', 401);
+  if (token && expiresAt - Date.now() > 30_000) return token;
+
+  minting ??= (async () => {
+    try {
+      const { data, error } = await authClient.$fetch<{ token: string }>('/token', { method: 'GET' }).catch(() => {
+        throw new ApiError(OFFLINE, 0);
+      });
+      if (error?.status === 401) {
+        await signOut();
+        throw new ApiError('Your session expired. Sign in again.', 401);
+      }
+      if (error) throw new ApiError(OFFLINE, 0);
+
+      setToken(data.token);
+      return data.token;
+    } finally {
+      minting = null;
+    }
+  })();
+
+  return minting;
+}
+
+async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const headers = new Headers(init.headers);
   if (init.body) headers.set('content-type', 'application/json');
-  if (auth) headers.set('authorization', `Bearer ${await validToken()}`);
+  headers.set('authorization', `Bearer ${await validToken()}`);
+
   let res: Response;
   try {
     res = await fetch(`${API_URL}/v1${path}`, { ...init, headers });
   } catch {
-    throw new ApiError("Can't reach Formcast. Check your connection.", 0);
+    throw new ApiError(OFFLINE, 0);
   }
+
   if (!res.ok) {
     const body = (await res.json().catch(() => ({}))) as { error?: string };
-    if (res.status === 401 && auth) await useAuth.getState().clear();
+    if (res.status === 401) await signOut();
     throw new ApiError(body.error ?? `Request failed (${res.status})`, res.status);
   }
+
   return res.json() as Promise<T>;
 }
 
 export const api = {
-  signIn: (email: string, password: string) =>
-    request<AuthResponse>('/auth/sign-in', { method: 'POST', body: JSON.stringify({ email, password }) }, false),
-  signOut: (refreshToken: string) =>
-    request<{ ok: true }>('/auth/sign-out', { method: 'POST', body: JSON.stringify({ refreshToken }) }, false),
   jobs: (date: string) => request<JobSummaryDto[]>(`/jobs?date=${date}`),
   calendar: (from: string, to: string) => request<string[]>(`/calendar?from=${from}&to=${to}`),
   job: (id: string) => request<JobDetailDto>(`/jobs/${id}`),
