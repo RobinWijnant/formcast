@@ -2,28 +2,32 @@ import { z } from 'zod';
 import { normalizeValue } from './fieldTypes';
 import { FIELD_BY_KEY, GROUP_BY_KEY } from './schema';
 
-export type FieldValue = string | number | boolean | string[];
-export type LineValues = Record<string, string | number>;
+const fieldValue = z.union([z.string(), z.number(), z.boolean(), z.array(z.string())]);
+const lineValues = z.record(z.string(), z.union([z.string(), z.number()]));
 
-export interface FieldOp {
-  op: 'set' | 'clear';
-  fieldKey: string;
-  value?: FieldValue;
-}
-
-export interface LineOp {
-  op: 'create' | 'update' | 'delete';
-  groupKey: string;
+const fieldOp = z.object({
+  op: z.enum(['set', 'clear']),
+  fieldKey: z.string(),
+  value: fieldValue.optional(),
+});
+const lineOp = z.object({
+  op: z.enum(['create', 'update', 'delete']),
+  groupKey: z.string(),
   /** DB id for update/delete, `tmp_<n>` for create. */
-  lineId: string;
-  values?: LineValues;
-}
-
+  lineId: z.string(),
+  values: lineValues.optional(),
+});
 /** The full set of pending changes on top of the committed form. */
-export interface ProposalSet {
-  fieldOps: FieldOp[];
-  lineOps: LineOp[];
-}
+const proposalSet = z.object({
+  fieldOps: z.array(fieldOp),
+  lineOps: z.array(lineOp),
+});
+
+export type FieldValue = z.infer<typeof fieldValue>;
+export type LineValues = z.infer<typeof lineValues>;
+export type FieldOp = z.infer<typeof fieldOp>;
+export type LineOp = z.infer<typeof lineOp>;
+export type ProposalSet = z.infer<typeof proposalSet>;
 
 export const EMPTY_PROPOSALS: ProposalSet = { fieldOps: [], lineOps: [] };
 
@@ -37,14 +41,12 @@ export const opKey = (op: FieldOp | LineOp): OpKey => ('fieldKey' in op ? fieldO
 export const committedLineIds = (lines: { id: string }[]) => new Set(lines.map((l) => l.id));
 
 // Loose shapes: what we accept from the model or a client before normalizing.
-const rawFieldOp = z.object({
+const rawFieldOp = fieldOp.extend({
   op: z.string(),
-  fieldKey: z.string(),
   value: z.unknown().optional(),
 });
-const rawLineOp = z.object({
+const rawLineOp = lineOp.extend({
   op: z.string(),
-  groupKey: z.string(),
   lineId: z.string().optional().nullable(),
   values: z.record(z.string(), z.unknown()).optional().nullable(),
 });
