@@ -8,14 +8,16 @@ Built for the Highsail full-stack case (Live Voice Form Filler). Designs: [docs/
 
 ### In the app
 
-| Screen | What it does |
-|---|---|
-| Sign in | Neon Auth account, signed in straight from the app |
-| Microphone priming | Shows the fill animation before the iOS permission prompt |
-| Today | The technician's jobs in schedule order, a week strip, travel gaps between jobs |
-| Job detail | Client, access note, map tile (opens directions), phone tile (calls), visit history, **Start job** |
-| Job form | Appliance (prefilled from the last visit), Measurements, Materials used, Conclusion, Job. Priority and tags in the header. **Start speaking** opens the live dock; tap any field, material or header pill to type instead; **Save** top right |
-| Settings | Speech language, auto-fill delay, live transcript, vibrate on fill, demo script, sign out |
+<table>
+  <tr>
+    <td align="center" valign="top" width="240"><img src="docs/screenshots/today.png" width="220" alt="Today"><br><b>Today</b><br><sub>Jobs in schedule order, a week strip, travel gaps between jobs</sub></td>
+    <td align="center" valign="top" width="240"><img src="docs/screenshots/job-detail.png" width="220" alt="Job detail"><br><b>Job detail</b><br><sub>Client, access note, map and phone tiles, visit history</sub></td>
+    <td align="center" valign="top" width="240"><img src="docs/screenshots/job-form.png" width="220" alt="Job form"><br><b>Job form</b><br><sub>Appliance prefilled from the last visit. Talk, or tap a field to type</sub></td>
+    <td align="center" valign="top" width="240"><img src="docs/screenshots/live-proposals.png" width="220" alt="Live proposals"><br><b>Live proposals</b><br><sub>Heard lines appear as NEW with a countdown before they fill</sub></td>
+    <td align="center" valign="top" width="240"><img src="docs/screenshots/live-correction.png" width="220" alt="Corrections"><br><b>Corrections</b><br><sub>“Make the cable 15 meters. Forget the screws.”</sub></td>
+    <td align="center" valign="top" width="240"><img src="docs/screenshots/settings.png" width="220" alt="Settings"><br><b>Settings</b><br><sub>Speech language, auto-fill delay, live transcript, demo script</sub></td>
+  </tr>
+</table>
 
 ### How it works
 
