@@ -63,6 +63,7 @@ export function createVoiceSession(job: JobDetailDto, send: (msg: ServerMessage)
   async function runModel(): Promise<boolean> {
     const upTo = transcript.length;
     if (upTo === processedSegments) return true;
+
     send({ type: 'status', state: 'updating' });
     try {
       const { set, dropped, ms } = await proposeChanges(
@@ -70,12 +71,15 @@ export function createVoiceSession(job: JobDetailDto, send: (msg: ServerMessage)
         AbortSignal.timeout(MODEL_TIMEOUT_MS),
       );
       processedSegments = upTo;
+
       if (dropped.length) console.warn('[engine] dropped ops:', dropped.join('; '));
       console.log(`[engine] ${ms} ms, ${set.fieldOps.length} field ops, ${set.lineOps.length} line ops`);
+
       publish(withoutRejected(withoutNoops(set)));
     } catch (err) {
       console.error('[engine]', err);
       if (!stopping) send({ type: 'status', state: 'listening' });
+
       if (retries++ < 3) {
         // Rate limit or a slow model: keep the transcript and try again shortly.
         setTimeout(trigger, RETRY_MS);
@@ -83,16 +87,20 @@ export function createVoiceSession(job: JobDetailDto, send: (msg: ServerMessage)
         send({ type: 'error', code: 'llm', message: 'Could not update the form. Keep talking or try again.' });
         processedSegments = upTo;
       }
+
       return false;
     }
+
     retries = 0;
     if (!stopping) send({ type: 'status', state: 'listening' });
+
     return true;
   }
 
   // Single flight: if speech arrives while the model runs, run once more after.
   function trigger() {
     if (running) return;
+
     running = (async () => {
       while (transcript.length > processedSegments) {
         if (!(await runModel())) break;
@@ -111,10 +119,12 @@ export function createVoiceSession(job: JobDetailDto, send: (msg: ServerMessage)
   let sttRate: number | undefined;
   let sttReopens = 0;
   let audioBytes = 0;
+
   const audioLog = setInterval(() => {
     console.log(`[session] ${job.code} audio ${Math.round(audioBytes / 1024)} KB in 10 s, transcript ${transcript.length} segments`);
     audioBytes = 0;
   }, 10_000);
+
   console.log(`[session] ${job.code} opened`);
 
   const openStt = (sampleRate?: number) => (stt ??= openDeepgram({
@@ -128,6 +138,7 @@ export function createVoiceSession(job: JobDetailDto, send: (msg: ServerMessage)
     onClose: (code) => {
       stt = undefined;
       if (stopping || finished) return void finish();
+
       // Deepgram ended the stream while the technician is still talking (idle
       // timeout, network blip): open a fresh one and keep the session alive.
       if (sttReopens++ < 5) {
@@ -142,12 +153,15 @@ export function createVoiceSession(job: JobDetailDto, send: (msg: ServerMessage)
 
   async function finish() {
     if (finished) return;
+
     finished = true;
     clearInterval(audioLog);
     console.log(`[session] ${job.code} finished (stopping=${stopping})`);
     clearTimeout(timer);
+
     trigger();
     await running;
+
     send({ type: 'done' });
     close();
   }
@@ -159,6 +173,7 @@ export function createVoiceSession(job: JobDetailDto, send: (msg: ServerMessage)
     onAudio(chunk: ArrayBuffer) {
       // An empty binary frame means "close stream" to Deepgram: never forward one.
       if (!chunk.byteLength) return;
+
       audioBytes += chunk.byteLength;
       if (!stopping) openStt().send(chunk);
     },
@@ -173,6 +188,7 @@ export function createVoiceSession(job: JobDetailDto, send: (msg: ServerMessage)
         case 'reject': {
           const op = [...pending.fieldOps, ...pending.lineOps].find((o) => opKey(o) === msg.key);
           if (!op) return;
+
           rejected.set(msg.key, JSON.stringify(op));
           publish(withoutRejected(pending));
           break;
@@ -182,6 +198,7 @@ export function createVoiceSession(job: JobDetailDto, send: (msg: ServerMessage)
           send({ type: 'status', state: 'stopping' });
           if (stt) stt.finish();
           else void finish();
+
           // Deepgram normally closes within a second; don't wait forever.
           setTimeout(() => void finish(), 4000);
           break;
@@ -189,6 +206,7 @@ export function createVoiceSession(job: JobDetailDto, send: (msg: ServerMessage)
     },
     onClose(code?: number) {
       if (!finished) console.log(`[session] ${job.code} client closed (${code ?? '-'}) before finishing`);
+
       clearInterval(audioLog);
       stopping = true;
       finished = true;

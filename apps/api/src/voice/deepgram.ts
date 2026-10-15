@@ -29,6 +29,7 @@ export function openDeepgram(events: SttEvents, sampleRate = AUDIO_SAMPLE_RATE) 
     smart_format: 'true',
     endpointing: '300',
   });
+
   const ws = new WebSocket(`wss://api.deepgram.com/v1/listen?${params}`, ['token', env.deepgramApiKey]);
   ws.binaryType = 'arraybuffer';
 
@@ -46,6 +47,7 @@ export function openDeepgram(events: SttEvents, sampleRate = AUDIO_SAMPLE_RATE) 
     for (const chunk of queue.splice(0)) ws.send(chunk);
     if (closing) ws.send(JSON.stringify({ type: 'CloseStream' }));
   });
+
   ws.addEventListener('message', (event) => {
     let msg: DeepgramResult;
     try {
@@ -53,8 +55,11 @@ export function openDeepgram(events: SttEvents, sampleRate = AUDIO_SAMPLE_RATE) 
     } catch {
       return;
     }
+
     if (msg.type !== 'Results') return;
+
     const text = msg.channel?.alternatives?.[0]?.transcript?.trim() ?? '';
+
     if (msg.is_final) {
       if (text) events.onFinal(text);
       events.onInterim('');
@@ -62,7 +67,9 @@ export function openDeepgram(events: SttEvents, sampleRate = AUDIO_SAMPLE_RATE) 
       events.onInterim(text);
     }
   });
+
   ws.addEventListener('error', () => events.onError('Speech recognition connection failed'));
+
   ws.addEventListener('close', (event) => {
     clearInterval(keepAlive);
     open = false;
@@ -73,18 +80,21 @@ export function openDeepgram(events: SttEvents, sampleRate = AUDIO_SAMPLE_RATE) 
   return {
     send(chunk: ArrayBuffer) {
       if (closing) return;
+
       if (open) ws.send(chunk);
       else queue.push(chunk);
     },
     /** Flushes remaining audio; Deepgram sends the last finals, then closes. */
     finish() {
       if (closing) return;
+
       closing = true;
       if (open) ws.send(JSON.stringify({ type: 'CloseStream' }));
     },
     abort() {
       closing = true;
       clearInterval(keepAlive);
+
       try {
         ws.close();
       } catch {

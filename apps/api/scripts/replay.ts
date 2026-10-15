@@ -12,6 +12,7 @@ const expectField = (key: string, value: FieldValue | undefined): Check => (s) =
   const got = op?.op === 'set' ? op.value : undefined;
   return JSON.stringify(got) === JSON.stringify(value) ? null : `${key}: expected ${JSON.stringify(value)}, got ${JSON.stringify(got)}`;
 };
+
 const expectLines = (expected: Record<string, number>): Check => (s) => {
   const got = Object.fromEntries(s.lineOps.filter((l) => l.op === 'create').map((l) => [String(l.values?.material).toLowerCase(), l.values?.quantity]));
   return JSON.stringify(got) === JSON.stringify(expected) ? null : `lines: expected ${JSON.stringify(expected)}, got ${JSON.stringify(got)}`;
@@ -36,20 +37,24 @@ async function run(name: string, steps: [string, Check[]][], job: { values: Reco
   let pending: ProposalSet = EMPTY_PROPOSALS;
   const transcript: string[] = [];
   let failures = 0;
+
   console.log(`\n${name}`);
   for (const [utterance, checks] of steps) {
     transcript.push(utterance);
     const { set, dropped, ms } = await proposeChanges({ job, pending, transcript, today: '2026-10-14' });
     pending = set;
+
     const errors = checks.map((c) => c(set)).filter(Boolean);
     failures += errors.length;
     console.log(`${errors.length ? '✗' : '✓'} ${ms.toString().padStart(5)} ms  "${utterance}"${errors.length ? `\n    ${errors.join('\n    ')}` : ''}${dropped.length ? `\n    dropped: ${dropped.join('; ')}` : ''}`);
   }
+
   return failures;
 }
 
 const failures =
   (await run('Round 1', round1, { values: { priority: 'medium', tags: [] }, lines: [] })) +
   (await run('Round 2 (after save)', round2, { values: { priority: 'medium', tags: [], arrivalTime: '10:00' }, lines: [] }));
+
 console.log(failures ? `\n${failures} check(s) failed` : '\nAll checks passed');
 process.exit(failures ? 1 : 0);

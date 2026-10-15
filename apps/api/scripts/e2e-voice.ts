@@ -7,6 +7,7 @@ import { mkdtempSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { JobDetailDto, JobSummaryDto, ProposalSet, ServerMessage } from '@formcast/shared';
+import { env } from '../src/env';
 import { DEMO_USER } from './demo-user';
 
 const API = process.env.API_URL ?? 'http://localhost:8787';
@@ -33,6 +34,7 @@ async function api<T>(path: string, token: string, init: RequestInit = {}): Prom
 async function session(jobId: string, token: string, pending: ProposalSet, utterances: string[]): Promise<ProposalSet> {
   const ws = new WebSocket(`${API.replace(/^http/, 'ws')}/v1/jobs/${jobId}/session?token=${token}`);
   let set: ProposalSet = pending;
+
   const done = new Promise<void>((resolve, reject) => {
     ws.addEventListener('message', (e) => {
       const msg = JSON.parse(String(e.data)) as ServerMessage;
@@ -49,9 +51,11 @@ async function session(jobId: string, token: string, pending: ProposalSet, utter
         resolve();
       }
     });
+
     ws.addEventListener('error', () => reject(new Error('socket error')));
     ws.addEventListener('close', () => resolve());
   });
+
   await new Promise<void>((r) => ws.addEventListener('open', () => r(), { once: true }));
   ws.send(JSON.stringify({ type: 'init', pending }));
 
@@ -63,8 +67,10 @@ async function session(jobId: string, token: string, pending: ProposalSet, utter
       await new Promise((r) => setTimeout(r, 100));
     }
   }
+
   ws.send(JSON.stringify({ type: 'stop' }));
   await done;
+
   return set;
 }
 
@@ -75,16 +81,22 @@ function assert(cond: unknown, message: string) {
   } else console.log(`✓ ${message}`);
 }
 
-const auth = await (await fetch(`${API}/v1/auth/sign-in`, {
+// Sign in against Neon Auth like the app does, then mint an API JWT from the session.
+const signIn = await fetch(`${env.authBaseUrl}/sign-in/email`, {
   method: 'POST',
   headers: { 'content-type': 'application/json' },
   body: JSON.stringify({ email: DEMO_USER.email, password: DEMO_USER.password }),
-})).json() as { token: string };
+});
+const cookie = signIn.headers.getSetCookie().find((c) => c.startsWith('__Secure-neon-auth.session_token='))?.split(';')[0];
+if (!cookie) throw new Error(`Neon Auth sign-in failed: ${signIn.status}`);
+
+const auth = (await (await fetch(`${env.authBaseUrl}/token`, { headers: { cookie } })).json()) as { token: string };
 
 const today = new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Brussels' });
 const list = await api<JobSummaryDto[]>(`/jobs?date=${today}`, auth.token);
 const target = list.find((j) => j.code === 'JOB-1042');
 if (!target) throw new Error('JOB-1042 not found, run pnpm db:seed');
+
 let job = await api<JobDetailDto>(`/jobs/${target.id}/start`, auth.token, { method: 'POST' });
 log(`started ${job.code}, appliance prefilled from ${job.appliancePrefilledFrom}`);
 
@@ -101,6 +113,7 @@ let res = await api<{ job: JobDetailDto; skipped: string[] }>(`/jobs/${job.id}/c
   body: JSON.stringify({ baseVersion: job.version, proposals: round1 }),
 });
 job = res.job;
+
 assert(job.values.arrivalTime === '10:00', `arrival time saved as 10:00 (got ${job.values.arrivalTime})`);
 assert(job.lines.length === 1 && /cable/i.test(String(job.lines[0]?.values.material)) && job.lines[0]?.values.quantity === 15, `one material line: cable 15 m (got ${JSON.stringify(job.lines.map((l) => l.values))})`);
 
@@ -111,6 +124,7 @@ const round2 = await session(job.id, auth.token, { fieldOps: [], lineOps: [] }, 
 ]);
 res = await api(`/jobs/${job.id}/commit`, auth.token, { method: 'POST', body: JSON.stringify({ baseVersion: job.version, proposals: round2 }) });
 job = res.job;
+
 assert(job.priority === 'high', `priority saved as high (got ${job.priority})`);
 assert(JSON.stringify(job.tags) === '["warranty"]', `tags saved as [warranty] (got ${JSON.stringify(job.tags)})`);
 

@@ -3,7 +3,6 @@
 //   pnpm db:seed
 import { Pool } from 'pg';
 import { env } from '../src/env';
-
 import { DEMO_USER } from './demo-user';
 
 const pool = new Pool({ connectionString: (process.env.DATABASE_URL_UNPOOLED ?? env.databaseUrl).replace('sslmode=require', 'sslmode=verify-full') });
@@ -14,6 +13,7 @@ async function ensureDemoUser() {
     headers: { 'content-type': 'application/json', origin: 'http://localhost:8081' },
     body: JSON.stringify(DEMO_USER),
   });
+
   if (res.ok) console.log('Created demo user');
   else console.log(`Demo user exists (${res.status})`);
 }
@@ -61,10 +61,12 @@ const jobs: SeedJob[] = [
 
 async function main() {
   await ensureDemoUser();
+
   const c = await pool.connect();
   try {
     await c.query('begin');
     await c.query('truncate job_lines, job_values, jobs, appliances, clients cascade');
+
     const clientIds = new Map<string, string>();
     for (const cl of clients) {
       const { rows } = await c.query(
@@ -73,6 +75,7 @@ async function main() {
       );
       clientIds.set(cl.key, rows[0].id);
     }
+
     const { rows: appl } = await c.query(
       `insert into appliances (client_id, label, year_built) values ($1, 'Vaillant ecoTEC plus', 2016) returning id`,
       [clientIds.get('vandamme')],
@@ -87,13 +90,16 @@ async function main() {
         [j.code, j.title, j.description, clientIds.get(j.client), j.client === 'vandamme' ? appl[0].id : null, j.start, j.end, j.status, j.priority, j.tags, j.outcome ?? null],
       );
       const jobId = rows[0].id;
+
       for (const [key, value] of Object.entries(j.values ?? {})) {
         await c.query('insert into job_values (job_id, field_key, value) values ($1,$2,$3)', [jobId, key, JSON.stringify(value)]);
       }
+
       for (const [i, line] of (j.lines ?? []).entries()) {
         await c.query('insert into job_lines (job_id, group_key, values, position) values ($1, $2, $3, $4)', [jobId, 'materials', JSON.stringify(line), i]);
       }
     }
+
     await c.query('commit');
     console.log(`Seeded ${clients.length} clients and ${jobs.length} jobs`);
   } catch (err) {
