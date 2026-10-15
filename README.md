@@ -112,6 +112,7 @@ A review pass over the first version. Each point started as a question about the
 - **The whole transcript goes to Gemini on every run.** Within a session nothing is trimmed: 15 minutes of talking is about 2,000 words, re-sent every few seconds. Send only the recent segments (the pending set already captures what was said earlier) and run the model on pauses (Deepgram's `speech_final`) instead of on every final segment.
 - **The transcript lives only in memory.** If the socket drops or the instance is evicted, the session's transcript is gone. The app keeps its proposals and sends them back on reconnect, but a resumable session needs the transcript stored server-side. That store would also give a session timeline for debugging and an eval set for running `replay` in CI.
 - **Shared module names are vague.** `packages/shared` has `schema.ts`, `ops.ts` and `protocol.ts`, which sound alike. Rename after what they hold: the form definition (`form.ts`), the proposals (`proposals.ts`) and the wire contract.
+- **The mobile app code hasn't been reviewed yet.** The review pass above covered the API and the shared package. `apps/mobile` still needs the same look at structure, naming and dead code.
 - **Seed sign-up still uses the localhost origin.** Neon Auth requires an origin on sign-up, so `seed.ts` sends `Origin: http://localhost:8081`.
 
 ### Known limitations
