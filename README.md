@@ -8,16 +8,9 @@ Built for the Highsail full-stack case (Live Voice Form Filler). Designs: [docs/
 
 ### In the app
 
-<table>
-  <tr>
-    <td align="center" valign="top" width="240"><img src="docs/screenshots/today.png" width="220" alt="Today"><br><b>Today</b><br><sub>Jobs in schedule order, a week strip, travel gaps between jobs</sub></td>
-    <td align="center" valign="top" width="240"><img src="docs/screenshots/job-detail.png" width="220" alt="Job detail"><br><b>Job detail</b><br><sub>Client, access note, map and phone tiles, visit history</sub></td>
-    <td align="center" valign="top" width="240"><img src="docs/screenshots/job-form.png" width="220" alt="Job form"><br><b>Job form</b><br><sub>Appliance prefilled from the last visit. Talk, or tap a field to type</sub></td>
-    <td align="center" valign="top" width="240"><img src="docs/screenshots/live-proposals.png" width="220" alt="Live proposals"><br><b>Live proposals</b><br><sub>Heard lines appear as NEW with a countdown before they fill</sub></td>
-    <td align="center" valign="top" width="240"><img src="docs/screenshots/live-correction.png" width="220" alt="Corrections"><br><b>Corrections</b><br><sub>“Make the cable 15 meters. Forget the screws.”</sub></td>
-    <td align="center" valign="top" width="240"><img src="docs/screenshots/settings.png" width="220" alt="Settings"><br><b>Settings</b><br><sub>Speech language, auto-fill delay, live transcript, demo script</sub></td>
-  </tr>
-</table>
+![Formcast screens: Today, job detail, job form, live proposals, a spoken correction and settings](docs/screenshots.png)
+
+Today · Job detail · Job form · Live proposals while talking · A spoken correction ("make the cable 15 meters, forget the screws") · Settings
 
 ### How it works
 
