@@ -19,16 +19,34 @@ Built for the Highsail full-stack case (Live Voice Form Filler). Designs: [docs/
 
 ### How it works
 
-```
-Expo app (iOS)                         Neon Functions (Hono, Node 24)                 External
-───────────────                        ────────────────────────────                  ────────
-expo-audio useAudioStream ─ PCM 16k ─▶ WS /v1/jobs/:id/session ── PCM ─────────────▶ Deepgram nova-3 (live STT)
-                                         │  transcript segments ◀────────────────── interim + final text
-drafts store (proposal layer) ◀─ proposals snapshot ── session: debounce 300 ms,
-  heard → (5 s) → filled ✓                │  single flight ─ prompt ────────────────▶ Gemini 3.1 Flash Lite
-                                         │  normalize + validate ◀─ full proposal set  (structured JSON)
-Save ─ POST /v1/jobs/:id/commit ───────▶ one Postgres transaction (version check) ──▶ Neon Postgres (Drizzle)
-Sign in ─ Better Auth Expo client ─────▶ Neon Auth (Managed Better Auth) → session → JWT (EdDSA, 15 min)
+```mermaid
+flowchart LR
+  subgraph App["Expo app (iOS)"]
+    Mic["expo-audio<br/>PCM 16 kHz"]
+    Drafts["Drafts store<br/>heard → 5 s → filled ✓"]
+    Save["Save"]
+    SignIn["Better Auth<br/>Expo client"]
+  end
+
+  subgraph API["Neon Functions (Hono, Node 24)"]
+    Session["WS /v1/jobs/:id/session<br/>debounce 300 ms · single flight"]
+    Validate["normalize + validate"]
+    Commit["POST /v1/jobs/:id/commit<br/>one transaction, version check"]
+  end
+
+  Deepgram["Deepgram nova-3<br/>live speech-to-text"]
+  Gemini["Gemini 3.1 Flash Lite<br/>structured JSON"]
+  Postgres[("Neon Postgres<br/>Drizzle")]
+  Auth["Neon Auth<br/>Managed Better Auth"]
+
+  Mic -- "audio" --> Session
+  Session -- "audio" --> Deepgram
+  Deepgram -- "interim + final text" --> Session
+  Session -- "prompt" --> Gemini
+  Gemini -- "full proposal set" --> Validate
+  Validate -- "proposals snapshot" --> Drafts
+  Save --> Commit --> Postgres
+  SignIn -- "session → JWT (EdDSA, 15 min)" --> Auth
 ```
 
 - **Live speech in, live proposals out.** The app streams 16 kHz PCM over one WebSocket. The API relays it to Deepgram's live API, shows interim text as a caption and runs the model on final segments, debounced by 300 ms. Only one model call runs at a time; speech that arrives during a run triggers one more run. Proposals typically update 1–2 s after a sentence ends.
