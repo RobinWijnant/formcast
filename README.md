@@ -44,15 +44,6 @@ flowchart LR
   SignIn -- "session → JWT (EdDSA, 15 min)" --> Auth
 ```
 
-- **Live speech in, live proposals out.** The app streams 16 kHz PCM over one WebSocket. The API relays it to Deepgram's live API, shows interim text as a caption and runs the model on final segments, debounced by 300 ms. Only one model call runs at a time; speech that arrives during a run triggers one more run. Proposals typically update 1–2 s after a sentence ends.
-- **A proposal layer, not direct edits.** The session keeps a proposal set (field ops `set`/`clear`, line ops `create`/`update`/`delete`) on top of the saved form. The app shows saved values and proposals separately. Save sends the set; the API validates it and applies it in one transaction with an optimistic `version` check (`409` on conflict).
-- **The model returns the whole set, never a delta.** Every run gets the saved form, the pending set and the session transcript. "No, scrap that" produces a set without the arrival time; "make the cable fifteen" produces the same `tmp_1` line with a new quantity. Running the same transcript again gives the same set.
-- **Nothing the model says is trusted.** `normalizeProposalSet` (shared package, Zod) checks every op against the form schema. Unknown fields, bad options, impossible times and updates to lines that don't exist are dropped and logged. Proposals equal to the saved value are filtered out.
-- **Heard → filled is handled by the app.** The server marks which ops changed and the app restarts that row's 5 s timer. Tapping the ring rejects a proposal; the server remembers it and won't propose the same value again.
-- **Fast enough on a free tier.** Gemini 3.1 Flash Lite at minimal thinking, temperature 0, JSON schema output. Slow calls are hedged with a second request on a fallback model after 2.5 s, and calls are budgeted per model to stay under the free-tier limit of 15 a minute.
-- **Auth without a proxy.** Neon Auth doesn't officially support native apps yet, but the Better Auth Expo client works against it. The app signs in directly, keeps the session in SecureStore and mints a 15-minute JWT from it. The API only verifies that JWT against Neon's JWKS, on every request and on the WebSocket handshake (`?token=`), and never sees a password. Sign-out is the one origin-checked call; the app sends `Origin: https://formcast.be`, a trusted domain in Neon Auth.
-- **Runs next to the database.** The API, WebSockets included, runs on Neon Functions on the same branch as Postgres. The form schema is hardcoded (the brief rules out a form builder): scalar fields are rows in `job_values` (jsonb), repeating rows in `job_lines`, priority and tags live on `jobs`.
-
 ### Repository layout
 
 | Path | Contents |
