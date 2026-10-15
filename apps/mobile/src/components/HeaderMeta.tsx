@@ -5,6 +5,7 @@ import { colors, fonts, PRIORITY_TONE } from '@/lib/theme';
 import type { Draft } from '@/voice/drafts';
 import { CountdownRing } from './CountdownRing';
 import { Icon } from './Icon';
+import { useRowRegistry } from './rowRegistry';
 import { T } from './ui';
 
 type HeaderKey = 'priority' | 'tags';
@@ -23,6 +24,7 @@ const Check = () => <Icon name="check" size={15} color={colors.green} strokeWidt
 /** Priority and tags in the job header; both can be changed by voice. */
 export function HeaderMeta({ job, draft, onReject, onEdit }: { job: JobDetailDto; draft?: Draft; onReject?: (key: string) => void; onEdit?: (fieldKey: HeaderKey) => void }) {
   const delay = usePrefs((s) => s.fillDelayMs);
+  const registry = useRowRegistry();
   const p = headerField(job, draft, 'priority');
   const t = headerField(job, draft, 'tags');
 
@@ -40,7 +42,17 @@ export function HeaderMeta({ job, draft, onReject, onEdit }: { job: JobDetailDto
   });
 
   return (
-    <View style={styles.meta}>
+    <View
+      style={styles.meta}
+      collapsable={false}
+      // Auto-scroll target for voice changes to priority and tags.
+      ref={(node) => {
+        for (const key of [p.key, t.key]) {
+          if (node) registry?.set(key, node);
+          else registry?.delete(key);
+        }
+      }}
+    >
       <Pressable {...editable('priority', 'Edit priority')} style={[styles.pill, { backgroundColor: PRIORITY_TONE[priority]?.bg ?? colors.chip }, p.heard && styles.heard]}>
         <T style={[styles.pillText, { color: PRIORITY_TONE[priority]?.fg ?? colors.text }, p.heard && { color: colors.amberText }]}>
           {formatValue(FIELD_BY_KEY.get('priority')!, priority)} prio
