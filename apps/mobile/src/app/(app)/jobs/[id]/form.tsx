@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Linking, Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { router, useLocalSearchParams, useNavigation } from 'expo-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { EMPTY_PROPOSALS, missingColumns, type LineOp, type ProposalSet } from '@formcast/shared';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Dock, DockError } from '@/components/Dock';
 import { EditSheet, type EditTarget } from '@/components/EditSheet';
@@ -17,6 +18,14 @@ import { colors, fonts } from '@/lib/theme';
 import { pendingCount, useDraft, useDrafts } from '@/voice/drafts';
 import { useVoiceSession } from '@/voice/useVoiceSession';
 
+/** What a save left behind: lines missing a column, and anything the server refused. */
+function unsavedNotice(incomplete: LineOp[], skipped: string[]): string | null {
+  const lines = incomplete.map((o) => `${String(o.values?.material ?? 'A new material')} still needs ${missingColumns(o).join(' and ')}`);
+  const refused = skipped.length ? [`${skipped.length} change${skipped.length === 1 ? '' : 's'} couldn't be saved`] : [];
+  const all = [...lines, ...refused];
+  return all.length ? `Not saved yet: ${all.join('; ')}.` : null;
+}
+
 export default function JobForm() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const queryClient = useQueryClient();
@@ -29,6 +38,7 @@ export default function JobForm() {
   const [editing, setEditing] = useState<EditTarget | null>(null);
   const [savedAt, setSavedAt] = useState<number | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [saveNotice, setSaveNotice] = useState<string | null>(null);
   const leaving = useRef(false);
   const dirty = pendingCount(draft) > 0;
   const rows = useMemo(() => new Map<string, View>(), []);
@@ -38,10 +48,11 @@ export default function JobForm() {
   const { height } = useWindowDimensions();
 
   // While talking, bring the field that just changed into view (above the dock).
-  const latestChange = Object.entries(draft.changedAt).sort((a, b) => b[1] - a[1])[0];
+  const [latestKey, latestAt] = Object.entries(draft.changedAt).sort((a, b) => b[1] - a[1])[0] ?? [];
+  const talking = voice.active;
   useEffect(() => {
-    if (!latestChange || !voice.active) return;
-    const row = rows.get(latestChange[0]);
+    if (!latestKey || !talking) return;
+    const row = rows.get(latestKey);
     if (!row || !content.current) return;
     row.measureLayout(
       content.current,
@@ -52,20 +63,27 @@ export default function JobForm() {
       },
       () => undefined,
     );
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [latestChange?.[0], latestChange?.[1]]);
+  }, [latestKey, latestAt, talking, rows, height]);
 
   const save = useMutation({
     mutationFn: async () => {
-      const current = job.data!;
-      return api.commit(id, { baseVersion: current.version, proposals: useDrafts.getState().drafts[id]?.pending ?? draft.pending });
+      // Saving while talking ends the session first: it gets the last words in,
+      // and a session that outlives the save would keep proposing saved changes.
+      if (voice.active) await voice.finish();
+      const pending = useDrafts.getState().drafts[id]?.pending ?? EMPTY_PROPOSALS;
+      // Lines still missing a column can't be saved; they stay as drafts.
+      const ready: ProposalSet = { fieldOps: pending.fieldOps, lineOps: pending.lineOps.filter((o) => !missingColumns(o).length) };
+      const incomplete = pending.lineOps.filter((o) => missingColumns(o).length);
+      const result = await api.commit(id, { baseVersion: job.data!.version, proposals: ready });
+      return { ...result, ready, incomplete };
     },
-    onSuccess: ({ job: saved }) => {
+    onSuccess: ({ job: saved, ready, incomplete, skipped }) => {
       queryClient.setQueryData(['job', id], saved);
       void queryClient.invalidateQueries({ queryKey: ['jobs'] });
-      useDrafts.getState().clear(id);
+      useDrafts.getState().settle(id, ready);
       setSavedAt(Date.now());
       setSaveError(null);
+      setSaveNotice(unsavedNotice(incomplete, skipped));
     },
     onError: (err) => {
       if (err instanceof ApiError && err.status === 409) {
@@ -139,11 +157,11 @@ export default function JobForm() {
           ]}
         >
           {save.isPending ? (
-            <ActivityIndicator color={recording ? colors.ink : '#FFFFFF'} />
+            <ActivityIndicator color={recording ? colors.ink : colors.onInk} />
           ) : (
             <>
               {saved ? <Icon name="check" size={18} color={colors.textMuted} strokeWidth={2} /> : null}
-              <T style={[styles.saveText, { color: !dirty ? (recording ? colors.ink : '#7D8287') : recording ? colors.ink : '#FFFFFF' }, saved && { color: colors.textMuted }]}>
+              <T style={[styles.saveText, { color: !dirty ? (recording ? colors.ink : colors.textDisabled) : recording ? colors.ink : colors.onInk }, saved && { color: colors.textMuted }]}>
                 {saved ? 'Saved' : 'Save'}
               </T>
             </>
@@ -172,6 +190,11 @@ export default function JobForm() {
           </View>
         )}
         {saveError ? <T style={styles.saveError}>{saveError}</T> : null}
+        {saveNotice && dirty ? (
+          <T style={styles.saveNotice} accessibilityRole="alert">
+            {saveNotice}
+          </T>
+        ) : null}
         <FormSections job={j} draft={draft} onReject={voice.reject} onEdit={onEdit} />
         </View>
         </RowRegistry.Provider>
@@ -198,7 +221,15 @@ export default function JobForm() {
       ) : voice.error && !recording ? (
         <DockError error={voice.error} onRetry={() => void voice.start()} onDismiss={voice.clearError} />
       ) : recording ? (
-        <Dock state={voice.state} transcript={voice.transcript} showTranscript={showTranscript} levels={voice.levels} startedAt={voice.startedAt} onStop={voice.stop} />
+        <Dock
+          state={voice.state}
+          transcript={voice.transcript}
+          showTranscript={showTranscript}
+          levels={voice.levels}
+          startedAt={voice.startedAt}
+          error={voice.error}
+          onStop={voice.stop}
+        />
       ) : (
         <SafeAreaView edges={['bottom']} style={styles.footer}>
           <T style={styles.hint}>Talk naturally, or tap a field to type.</T>
@@ -255,9 +286,10 @@ const styles = StyleSheet.create({
   h1: { fontFamily: fonts.semibold, fontSize: 26, letterSpacing: -0.6, marginTop: 4 },
   client: { fontSize: 15, color: colors.text, marginTop: 2 },
   saveError: { marginHorizontal: 28, marginTop: 12, color: colors.red, fontSize: 14 },
-  footer: { position: 'absolute', left: 0, right: 0, bottom: 0, paddingHorizontal: 16, paddingTop: 16, paddingBottom: 12, gap: 12, backgroundColor: colors.ground, borderTopWidth: 1, borderTopColor: '#E2E4DF' },
+  saveNotice: { marginHorizontal: 28, marginTop: 12, color: colors.amberText, fontSize: 14, lineHeight: 20 },
+  footer: { position: 'absolute', left: 0, right: 0, bottom: 0, paddingHorizontal: 16, paddingTop: 16, paddingBottom: 12, gap: 12, backgroundColor: colors.ground, borderTopWidth: 1, borderTopColor: colors.hairline },
   hint: { textAlign: 'center', fontSize: 13, color: colors.textFaint },
-  mic: { shadowColor: colors.amber, shadowOpacity: 0.5, shadowRadius: 0, shadowOffset: { width: 0, height: 0 }, borderWidth: 6, borderColor: 'rgba(243,190,90,0.28)' },
-  alert: { backgroundColor: colors.surface, borderRadius: 20, padding: 16, gap: 12, borderWidth: 1, borderColor: '#F0C9C3' },
+  mic: { shadowColor: colors.amber, shadowOpacity: 0.5, shadowRadius: 0, shadowOffset: { width: 0, height: 0 }, borderWidth: 6, borderColor: colors.amberGlow },
+  alert: { backgroundColor: colors.surface, borderRadius: 20, padding: 16, gap: 12, borderWidth: 1, borderColor: colors.redSoftBorder },
   alertIcon: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.redFill, alignItems: 'center', justifyContent: 'center' },
 });

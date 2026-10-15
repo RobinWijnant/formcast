@@ -23,9 +23,9 @@ export function Sheet({ visible, onClose, title, body, children }: { visible: bo
 }
 
 const styles = StyleSheet.create({
-  scrim: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(22,24,26,0.48)' },
+  scrim: { ...StyleSheet.absoluteFill, backgroundColor: colors.scrim },
   sheet: { position: 'absolute', left: 0, right: 0, bottom: 0, backgroundColor: colors.surface, borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingTop: 10, paddingHorizontal: 20, gap: 18 },
-  handle: { alignSelf: 'center', width: 40, height: 5, borderRadius: 3, backgroundColor: '#D5D8D3' },
+  handle: { alignSelf: 'center', width: 40, height: 5, borderRadius: 3, backgroundColor: colors.handle },
   title: { fontFamily: fonts.semibold, fontSize: 22, letterSpacing: -0.4 },
   body: { fontSize: 15, lineHeight: 22, color: colors.textMuted },
 });

@@ -55,10 +55,11 @@ Speaking is just a way of filling the form. There are no Finish/Cancel buttons i
 
 - Any revision of the field ("make that 15") re-highlights it and restarts the ring.
 - Tapping the ring rejects the proposal (optional, only touch interaction).
-- Incomplete lines (missing required column) stay highlighted with `Needs unit`, no ring.
+- Incomplete lines (missing required column) stay highlighted with `Needs unit`, no ring. Save leaves them as drafts and says what is still missing.
 - Speaking dock: transcript, status, level meter and a single **stop** button. Stopping does not save or discard.
 - Cancel from the brief = **Back** with unsaved changes → sheet "Leave without saving?" (Save and leave / Discard changes / Stay).
-- While recording, Save stays quiet (white, secondary, no count); it only becomes the primary dark button when recording is stopped and there are unsaved changes.
+- While recording, Save stays quiet (white, secondary, no count); it only becomes the primary dark button when recording is stopped and there are unsaved changes. Tapping it while recording stops the session first (its last words still land), then saves.
+- If the model fails to update the form while recording, the dock shows the error inline; it clears on the next successful update.
 - No separate undo toast: corrections happen by voice or by tapping the ring.
 
 The Finish review sheet (option B below) is dropped.

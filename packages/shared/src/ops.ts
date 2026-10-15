@@ -1,5 +1,6 @@
 import { z } from 'zod';
-import { FIELD_BY_KEY, GROUP_BY_KEY, type ColumnDef, type FieldDef } from './schema';
+import { normalizeValue } from './fieldTypes';
+import { FIELD_BY_KEY, GROUP_BY_KEY } from './schema';
 
 export type FieldValue = string | number | boolean | string[];
 export type LineValues = Record<string, string | number>;
@@ -26,8 +27,14 @@ export interface ProposalSet {
 
 export const EMPTY_PROPOSALS: ProposalSet = { fieldOps: [], lineOps: [] };
 
-export const opKey = (op: FieldOp | LineOp): string =>
-  'fieldKey' in op ? `field:${op.fieldKey}` : `line:${op.lineId}`;
+/** Identity of a pending change: one per field, one per line. */
+export type OpKey = `field:${string}` | `line:${string}`;
+export const fieldOpKey = (fieldKey: string): OpKey => `field:${fieldKey}`;
+export const lineOpKey = (lineId: string): OpKey => `line:${lineId}`;
+export const opKey = (op: FieldOp | LineOp): OpKey => ('fieldKey' in op ? fieldOpKey(op.fieldKey) : lineOpKey(op.lineId));
+
+/** Ids of the lines saved on a job: the only valid update/delete targets. */
+export const committedLineIds = (lines: { id: string }[]) => new Set(lines.map((l) => l.id));
 
 // Loose shapes: what we accept from the model or a client before normalizing.
 const rawFieldOp = z.object({
@@ -45,59 +52,6 @@ export const rawProposalSet = z.object({
   fieldOps: z.array(z.unknown()).default([]),
   lineOps: z.array(z.unknown()).default([]),
 });
-
-const TIME = /^(\d{1,2})[:.h](\d{2})$/;
-const DATE = /^\d{4}-\d{2}-\d{2}$/;
-
-function matchOption(options: { value: string; label: string }[] | undefined, raw: unknown) {
-  if (typeof raw !== 'string') return undefined;
-  const v = raw.trim().toLowerCase().replace(/\s+/g, '-');
-  return options?.find((o) => o.value === v || o.label.toLowerCase().replace(/\s+/g, '-') === v)?.value;
-}
-
-function toNumber(raw: unknown): number | undefined {
-  const n = typeof raw === 'number' ? raw : typeof raw === 'string' ? Number(raw.replace(',', '.').trim()) : NaN;
-  return Number.isFinite(n) ? n : undefined;
-}
-
-/** Coerces a raw value to the field's type. Returns undefined when it can't be applied. */
-export function normalizeValue(def: Pick<FieldDef, 'type' | 'options'> | ColumnDef, raw: unknown): FieldValue | undefined {
-  switch (def.type) {
-    case 'text': {
-      if (typeof raw !== 'string' && typeof raw !== 'number') return undefined;
-      const s = String(raw).trim();
-      return s.length ? s : undefined;
-    }
-    case 'number':
-      return toNumber(raw);
-    case 'time': {
-      const m = typeof raw === 'string' ? TIME.exec(raw.trim()) : null;
-      if (!m) return undefined;
-      const h = Number(m[1]);
-      const min = Number(m[2]);
-      if (h > 23 || min > 59) return undefined;
-      return `${String(h).padStart(2, '0')}:${String(min).padStart(2, '0')}`;
-    }
-    case 'date':
-      return typeof raw === 'string' && DATE.test(raw.trim()) && !Number.isNaN(Date.parse(raw)) ? raw.trim() : undefined;
-    case 'boolean':
-      if (typeof raw === 'boolean') return raw;
-      if (raw === 'true' || raw === 'yes') return true;
-      if (raw === 'false' || raw === 'no') return false;
-      return undefined;
-    case 'select':
-      return matchOption(def.options, raw);
-    case 'multiselect': {
-      if (!Array.isArray(raw)) return undefined;
-      const out: string[] = [];
-      for (const r of raw) {
-        const v = matchOption(def.options, r);
-        if (v && !out.includes(v)) out.push(v);
-      }
-      return out;
-    }
-  }
-}
 
 export interface NormalizeContext {
   /** Ids of lines that exist in the database (update/delete targets). */
@@ -125,7 +79,11 @@ export function normalizeProposalSet(input: unknown, ctx: NormalizeContext): Nor
     if (!r.success) { dropped.push('malformed field op'); continue; }
     const def = FIELD_BY_KEY.get(r.data.fieldKey);
     if (!def) { dropped.push(`unknown field ${r.data.fieldKey}`); continue; }
-    if (r.data.op === 'clear') { fields.set(def.key, { op: 'clear', fieldKey: def.key }); continue; }
+    if (r.data.op === 'clear') {
+      if (def.required) { dropped.push(`${def.key} can't be empty`); continue; }
+      fields.set(def.key, { op: 'clear', fieldKey: def.key });
+      continue;
+    }
     if (r.data.op !== 'set') { dropped.push(`bad op ${r.data.op} on ${def.key}`); continue; }
     const value = normalizeValue(def, r.data.value);
     if (value === undefined) { dropped.push(`invalid value for ${def.key}: ${JSON.stringify(r.data.value)}`); continue; }

@@ -1,6 +1,7 @@
 import {
   EMPTY_PROPOSALS,
   changedKeys,
+  committedLineIds,
   normalizeProposalSet,
   opKey,
   type ClientMessage,
@@ -21,7 +22,7 @@ const RETRY_MS = 2_000;
  * database until the app commits it.
  */
 export function createVoiceSession(job: JobDetailDto, send: (msg: ServerMessage) => void, close: () => void) {
-  const committedLineIds = new Set(job.lines.map((l) => l.id));
+  const lineIds = committedLineIds(job.lines);
   let pending: ProposalSet = EMPTY_PROPOSALS;
   const transcript: string[] = [];
   const rejected = new Map<string, string>(); // op key -> JSON of the rejected op
@@ -165,7 +166,7 @@ export function createVoiceSession(job: JobDetailDto, send: (msg: ServerMessage)
       switch (msg.type) {
         case 'init': {
           // Unsaved changes from an earlier session on this job.
-          pending = normalizeProposalSet(msg.pending, { committedLineIds }).set;
+          pending = normalizeProposalSet(msg.pending, { committedLineIds: lineIds }).set;
           openStt(msg.sampleRate && msg.sampleRate >= 8000 && msg.sampleRate <= 48000 ? msg.sampleRate : undefined);
           break;
         }

@@ -63,6 +63,7 @@ Deploy the API: `pnpm db:migrate && neon deploy` (migrations run as a deploy ste
 ```bash
 pnpm test                                   # shared: op validation, normalization, diffing
 pnpm typecheck
+pnpm --filter @formcast/mobile lint          # expo lint (incl. React hooks rules)
 pnpm --filter @formcast/api replay          # demo script through the real model, step by step, with checks
 pnpm --filter @formcast/api e2e:voice       # macOS `say` → PCM → WebSocket → Deepgram → Gemini → commit → DB checks
 ```

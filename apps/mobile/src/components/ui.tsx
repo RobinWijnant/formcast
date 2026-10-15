@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View, type StyleProp, type TextStyle, type ViewStyle } from 'react-native';
-import { colors, fonts, radius } from '@/lib/theme';
+import { colors, fonts, PRIORITY_TONE, radius } from '@/lib/theme';
 import { Icon, type IconName } from './Icon';
 
 export function T({ style, children, numberOfLines, accessibilityRole }: { style?: StyleProp<TextStyle>; children: ReactNode; numberOfLines?: number; accessibilityRole?: 'alert' | 'header' }) {
@@ -62,17 +62,18 @@ export function Button({
 }
 
 const variants: Record<Variant, { bg: string; fg: string }> = {
-  dark: { bg: colors.ink, fg: '#FFFFFF' },
-  amber: { bg: colors.amber, fg: '#2A1A01' },
-  danger: { bg: colors.red, fg: '#FFFFFF' },
+  dark: { bg: colors.ink, fg: colors.onInk },
+  amber: { bg: colors.amber, fg: colors.amberButtonText },
+  danger: { bg: colors.red, fg: colors.onInk },
   quiet: { bg: colors.ground, fg: colors.ink },
   ghost: { bg: 'transparent', fg: colors.text },
 };
 
-export function Pill({ children, tone = 'neutral', style }: { children: ReactNode; tone?: 'neutral' | 'high' | 'muted'; style?: StyleProp<ViewStyle> }) {
+export function Pill({ children, tone = 'neutral', style }: { children: ReactNode; tone?: 'neutral' | 'muted' | 'low' | 'medium' | 'high'; style?: StyleProp<ViewStyle> }) {
+  const p = PRIORITY_TONE[tone];
   return (
-    <View style={[styles.pill, tone === 'high' && styles.pillHigh, tone === 'muted' && styles.pillMuted, style]}>
-      <T style={[styles.pillText, tone === 'high' && { color: '#8F2416' }, tone === 'muted' && { color: colors.textFaint, fontFamily: fonts.regular }]}>{children}</T>
+    <View style={[styles.pill, p && { backgroundColor: p.bg }, tone === 'muted' && styles.pillMuted, style]}>
+      <T style={[styles.pillText, p && { color: p.fg }, tone === 'muted' && { color: colors.textFaint, fontFamily: fonts.regular }]}>{children}</T>
     </View>
   );
 }
@@ -97,8 +98,7 @@ export const styles = StyleSheet.create({
   buttonText: { fontFamily: fonts.semibold, fontSize: 16 },
   buttonTextBig: { fontSize: 19 },
   pill: { paddingHorizontal: 11, paddingVertical: 5, borderRadius: radius.pill, backgroundColor: colors.chip, flexDirection: 'row', alignItems: 'center', gap: 5 },
-  pillHigh: { backgroundColor: '#FBE0DC' },
-  pillMuted: { backgroundColor: 'transparent', borderWidth: 1, borderStyle: 'dashed', borderColor: '#B8BCB6' },
+  pillMuted: { backgroundColor: 'transparent', borderWidth: 1, borderStyle: 'dashed', borderColor: colors.dashed },
   pillText: { fontFamily: fonts.medium, fontSize: 13, color: colors.text },
   section: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 28, marginTop: 20, marginBottom: 8 },
   sectionText: { fontFamily: fonts.medium, fontSize: 13, color: colors.textMuted },

@@ -36,7 +36,7 @@ export function CountdownRing({ startedAt, duration, onReject, label }: { starte
           transform="rotate(-90 12 12)"
           animatedProps={props}
         />
-        <Path d="M9.5 9.5l5 5M14.5 9.5l-5 5" stroke="#7A4A05" strokeWidth={1.75} strokeLinecap="round" />
+        <Path d="M9.5 9.5l5 5M14.5 9.5l-5 5" stroke={colors.amberRingIcon} strokeWidth={1.75} strokeLinecap="round" />
       </Svg>
     </Pressable>
   );

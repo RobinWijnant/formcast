@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { changedKeys, missingColumns, normalizeProposalSet, normalizeValue } from './ops';
+import { normalizeValue } from './fieldTypes';
+import { changedKeys, missingColumns, normalizeProposalSet } from './ops';
 import { FIELD_BY_KEY } from './schema';
 
 const ctx = { committedLineIds: new Set(['line-db-1']) };
@@ -17,6 +18,12 @@ describe('normalizeValue', () => {
 });
 
 describe('normalizeProposalSet', () => {
+  it('never clears a required field', () => {
+    const { set, dropped } = normalizeProposalSet({ fieldOps: [{ op: 'clear', fieldKey: 'priority' }], lineOps: [] }, ctx);
+    expect(set.fieldOps).toEqual([]);
+    expect(dropped).toEqual(["priority can't be empty"]);
+  });
+
   it('keeps valid ops and drops invalid ones', () => {
     const { set, dropped } = normalizeProposalSet(
       {

@@ -55,12 +55,12 @@ export function ContactTiles({ client, eta }: { client: ClientDto; eta: string }
 
 const styles = StyleSheet.create({
   duo: { flexDirection: 'row', gap: 8, height: 132 },
-  tile: { flex: 1, borderRadius: 16, overflow: 'hidden', backgroundColor: '#E7EAE3' },
-  chip: { position: 'absolute', left: 8, bottom: 8, flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: '#FFFFFF', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 14 },
+  tile: { flex: 1, borderRadius: 16, overflow: 'hidden', backgroundColor: colors.mapLand },
+  chip: { position: 'absolute', left: 8, bottom: 8, flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: colors.surface, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 14 },
   chipText: { fontFamily: fonts.semibold, fontSize: 13 },
-  glass: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(255,255,255,0.62)', borderRadius: 16, borderWidth: 1, borderColor: 'rgba(255,255,255,0.7)' },
+  glass: { ...StyleSheet.absoluteFill, backgroundColor: colors.glassFill, borderRadius: 16, borderWidth: 1, borderColor: colors.glassBorder },
   phone: { ...StyleSheet.absoluteFill, padding: 12, gap: 2 },
-  phoneIcon: { width: 32, height: 32, borderRadius: 16, backgroundColor: 'rgba(22,24,26,0.07)', alignItems: 'center', justifyContent: 'center' },
+  phoneIcon: { width: 32, height: 32, borderRadius: 16, backgroundColor: colors.glassIcon, alignItems: 'center', justifyContent: 'center' },
   contact: { fontSize: 13, color: colors.textMuted },
   number: { fontFamily: fonts.semibold, fontSize: 15, letterSpacing: -0.3, color: colors.ink, fontVariant: ['tabular-nums'] },
 });

@@ -1,11 +1,15 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { Keyboard, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   FIELD_BY_KEY,
+  FIELD_TYPES,
   GROUP_BY_KEY,
+  fieldOpKey,
+  lineOpKey,
   normalizeValue,
   type FieldDef,
+  type FieldType,
   type FieldValue,
   type JobDetailDto,
   type LineValues,
@@ -28,25 +32,88 @@ function Choice({ label, selected, onPress }: { label: string; selected: boolean
       onPress={onPress}
       style={[styles.choice, selected && styles.choiceOn]}
     >
-      <T style={[styles.choiceText, selected && { color: '#FFFFFF' }]}>{label}</T>
+      <T style={[styles.choiceText, selected && { color: colors.onInk }]}>{label}</T>
     </Pressable>
   );
 }
 
+type TextInputProps = Partial<React.ComponentProps<typeof TextInput>>;
+
+interface EditorProps {
+  def: FieldDef;
+  text: string;
+  setText: (text: string) => void;
+  choice: FieldValue | undefined;
+  setChoice: (value: FieldValue | undefined) => void;
+  input: (props: TextInputProps) => ReactNode;
+}
+
+/** The input for each field type. Typed types read `text`, picked types `choice` (see FIELD_TYPES[type].entry). */
+const EDITORS: Record<FieldType, (p: EditorProps) => ReactNode> = {
+  text: ({ def, input }) => input({ multiline: def.key === 'remarks', placeholder: def.key === 'remarks' ? 'What did you notice or fix?' : undefined }),
+  number: ({ input }) => input({ keyboardType: 'decimal-pad', placeholder: '0' }),
+  time: ({ input, setText }) => (
+    <>
+      {input({ keyboardType: 'numbers-and-punctuation', placeholder: '10:30' })}
+      <View style={styles.choices}>
+        <Choice
+          label="Now"
+          selected={false}
+          onPress={() => setText(new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Brussels' }))}
+        />
+      </View>
+    </>
+  ),
+  date: ({ input, text, setText }) => (
+    <>
+      {input({ keyboardType: 'numbers-and-punctuation', placeholder: 'YYYY-MM-DD' })}
+      <View style={styles.choices}>
+        <Choice label="In 1 year" selected={text === addDays(isoDay(), 365)} onPress={() => setText(addDays(isoDay(), 365))} />
+        <Choice label="In 2 years" selected={text === addDays(isoDay(), 730)} onPress={() => setText(addDays(isoDay(), 730))} />
+      </View>
+    </>
+  ),
+  boolean: ({ choice, setChoice }) => (
+    <View style={styles.choices}>
+      <Choice label="Yes" selected={choice === true} onPress={() => setChoice(true)} />
+      <Choice label="No" selected={choice === false} onPress={() => setChoice(false)} />
+    </View>
+  ),
+  select: ({ def, choice, setChoice }) => (
+    <View style={styles.choices}>
+      {def.options?.map((o) => (
+        <Choice key={o.value} label={o.label} selected={choice === o.value} onPress={() => setChoice(o.value)} />
+      ))}
+    </View>
+  ),
+  multiselect: ({ def, choice, setChoice }) => {
+    const list = (choice as string[] | undefined) ?? [];
+    return (
+      <View style={styles.choices}>
+        {def.options?.map((o) => {
+          const on = list.includes(o.value);
+          return <Choice key={o.value} label={o.value} selected={on} onPress={() => setChoice(on ? list.filter((v) => v !== o.value) : [...list, o.value])} />;
+        })}
+      </View>
+    );
+  },
+};
+
 function FieldEditor({ def, job, draft, jobId, onDone }: { def: FieldDef; job: JobDetailDto; draft: Draft; jobId: string; onDone: () => void }) {
-  const committed = def.key === 'priority' ? job.priority : def.key === 'tags' ? job.tags : job.values[def.key];
+  const committed = job.values[def.key];
   const op = draft.pending.fieldOps.find((o) => o.fieldKey === def.key);
   const current = op ? (op.op === 'set' ? op.value : undefined) : committed;
+  const spec = FIELD_TYPES[def.type];
 
   const [text, setText] = useState(asText(current));
   const [choice, setChoice] = useState<FieldValue | undefined>(current);
   const [error, setError] = useState<string | null>(null);
   const store = useDrafts.getState();
-  const key = `field:${def.key}`;
+  const key = fieldOpKey(def.key);
 
   const apply = (value: FieldValue | undefined) => {
     if (value === undefined) {
-      if (committed === undefined || def.key === 'priority') store.remove(jobId, key);
+      if (committed === undefined || def.required) store.remove(jobId, key);
       else store.put(jobId, { op: 'clear', fieldKey: def.key });
     } else if (same(value, committed)) {
       store.remove(jobId, key);
@@ -57,19 +124,14 @@ function FieldEditor({ def, job, draft, jobId, onDone }: { def: FieldDef; job: J
   };
 
   const save = () => {
-    if (def.type === 'select' || def.type === 'boolean' || def.type === 'multiselect') return apply(choice);
+    if (spec.entry === 'pick') return apply(choice);
     if (!text.trim()) return apply(undefined);
     const value = normalizeValue(def, text);
-    if (value === undefined) {
-      setError(
-        def.type === 'time' ? 'Enter a time like 10:30.' : def.type === 'date' ? 'Enter a date like 2027-10-14.' : def.type === 'number' ? 'Enter a number.' : 'Enter a value.',
-      );
-      return;
-    }
+    if (value === undefined) return setError(spec.invalid ?? 'Enter a value.');
     apply(value);
   };
 
-  const input = (props: Partial<React.ComponentProps<typeof TextInput>>) => (
+  const input = (props: TextInputProps) => (
     <View style={styles.inputRow}>
       <TextInput
         accessibilityLabel={def.label}
@@ -91,61 +153,10 @@ function FieldEditor({ def, job, draft, jobId, onDone }: { def: FieldDef; job: J
 
   return (
     <>
-      {def.type === 'text' && input({ multiline: def.key === 'remarks', placeholder: def.key === 'remarks' ? 'What did you notice or fix?' : undefined })}
-      {def.type === 'number' && input({ keyboardType: 'decimal-pad', placeholder: '0' })}
-      {def.type === 'time' && (
-        <>
-          {input({ keyboardType: 'numbers-and-punctuation', placeholder: '10:30' })}
-          <View style={styles.choices}>
-            <Choice
-              label="Now"
-              selected={false}
-              onPress={() => setText(new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Brussels' }))}
-            />
-          </View>
-        </>
-      )}
-      {def.type === 'date' && (
-        <>
-          {input({ keyboardType: 'numbers-and-punctuation', placeholder: 'YYYY-MM-DD' })}
-          <View style={styles.choices}>
-            <Choice label="In 1 year" selected={text === addDays(isoDay(), 365)} onPress={() => setText(addDays(isoDay(), 365))} />
-            <Choice label="In 2 years" selected={text === addDays(isoDay(), 730)} onPress={() => setText(addDays(isoDay(), 730))} />
-          </View>
-        </>
-      )}
-      {def.type === 'boolean' && (
-        <View style={styles.choices}>
-          <Choice label="Yes" selected={choice === true} onPress={() => setChoice(true)} />
-          <Choice label="No" selected={choice === false} onPress={() => setChoice(false)} />
-        </View>
-      )}
-      {def.type === 'select' && (
-        <View style={styles.choices}>
-          {def.options?.map((o) => (
-            <Choice key={o.value} label={o.label} selected={choice === o.value} onPress={() => setChoice(o.value)} />
-          ))}
-        </View>
-      )}
-      {def.type === 'multiselect' && (
-        <View style={styles.choices}>
-          {def.options?.map((o) => {
-            const list = (choice as string[] | undefined) ?? [];
-            const on = list.includes(o.value);
-            return (
-              <Choice
-                key={o.value}
-                label={o.value}
-                selected={on}
-                onPress={() => setChoice(on ? list.filter((v) => v !== o.value) : [...list, o.value])}
-              />
-            );
-          })}
-        </View>
-      )}
+      {EDITORS[def.type]({ def, text, setText, choice, setChoice, input })}
       {error ? <T style={styles.error}>{error}</T> : null}
       <View style={styles.actions}>
-        {def.key !== 'priority' && (current !== undefined || def.type === 'multiselect') ? (
+        {!def.required && (current !== undefined || def.type === 'multiselect') ? (
           <Button title="Clear" variant="quiet" onPress={() => apply(def.type === 'multiselect' ? [] : undefined)} style={{ flex: 1 }} />
         ) : null}
         <Button title="Done" onPress={save} style={{ flex: 2 }} />
@@ -153,6 +164,10 @@ function FieldEditor({ def, job, draft, jobId, onDone }: { def: FieldDef; job: J
     </>
   );
 }
+
+// Ids for lines added by hand; the `tmp_` prefix marks a create, like the model's ids.
+let handLines = 0;
+const newLineId = () => `tmp_hand_${++handLines}`;
 
 function LineEditor({ lineId, job, draft, jobId, onDone }: { lineId?: string; job: JobDetailDto; draft: Draft; jobId: string; onDone: () => void }) {
   const group = GROUP_BY_KEY.get('materials')!;
@@ -180,17 +195,17 @@ function LineEditor({ lineId, job, draft, jobId, onDone }: { lineId?: string; jo
 
     if (committed) {
       const changed = Object.fromEntries(Object.entries(values).filter(([k, v]) => !same(committed.values[k], v)));
-      if (!Object.keys(changed).length) store.remove(jobId, `line:${committed.id}`);
+      if (!Object.keys(changed).length) store.remove(jobId, lineOpKey(committed.id));
       else store.put(jobId, { op: 'update', groupKey: 'materials', lineId: committed.id, values: changed });
     } else {
-      store.put(jobId, { op: 'create', groupKey: 'materials', lineId: lineId ?? `tmp_${Date.now()}`, values });
+      store.put(jobId, { op: 'create', groupKey: 'materials', lineId: lineId ?? newLineId(), values });
     }
     onDone();
   };
 
   const remove = () => {
     if (committed) store.put(jobId, { op: 'delete', groupKey: 'materials', lineId: committed.id });
-    else if (lineId) store.remove(jobId, `line:${lineId}`);
+    else if (lineId) store.remove(jobId, lineOpKey(lineId));
     onDone();
   };
 
@@ -217,10 +232,9 @@ function LineEditor({ lineId, job, draft, jobId, onDone }: { lineId?: string; jo
 /** Bottom sheet to change a field or a material line by hand. */
 export function EditSheet({ target, job, draft, jobId, onClose }: { target: EditTarget | null; job: JobDetailDto; draft: Draft; jobId: string; onClose: () => void }) {
   const insets = useSafeAreaInsets();
+  // Keeps the last target while the sheet fades out after `target` goes null.
   const [shown, setShown] = useState<EditTarget | null>(target);
-  useEffect(() => {
-    if (target) setShown(target);
-  }, [target]);
+  if (target && target !== shown) setShown(target);
   const [keyboard, setKeyboard] = useState(false);
   useEffect(() => {
     const show = Keyboard.addListener(Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow', () => setKeyboard(true));
@@ -262,11 +276,11 @@ export function EditSheet({ target, job, draft, jobId, onClose }: { target: Edit
 }
 
 const styles = StyleSheet.create({
-  scrim: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(22,24,26,0.48)' },
+  scrim: { ...StyleSheet.absoluteFill, backgroundColor: colors.scrim },
   wrap: { flex: 1, justifyContent: 'flex-end' },
   sheet: { backgroundColor: colors.surface, borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingTop: 10, paddingHorizontal: 20, gap: 14, maxHeight: '85%' },
   underlay: { position: 'absolute', left: 0, right: 0, top: '100%', height: 400, backgroundColor: colors.surface },
-  handle: { alignSelf: 'center', width: 40, height: 5, borderRadius: 3, backgroundColor: '#D5D8D3' },
+  handle: { alignSelf: 'center', width: 40, height: 5, borderRadius: 3, backgroundColor: colors.handle },
   title: { fontFamily: fonts.semibold, fontSize: 22, letterSpacing: -0.4 },
   label: { fontFamily: fonts.medium, fontSize: 13, color: colors.text },
   inputRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },

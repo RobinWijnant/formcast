@@ -3,6 +3,7 @@ import {
   FIELDS,
   FIELD_BY_KEY,
   LINE_GROUPS,
+  committedLineIds,
   normalizeProposalSet,
   type JobDetailDto,
   type NormalizeResult,
@@ -104,7 +105,7 @@ const RESPONSE_SCHEMA = {
           lineId: { type: 'string' },
           values: {
             type: 'object',
-            properties: { material: { type: 'string' }, quantity: { type: 'string' }, unit: { type: 'string' } },
+            properties: Object.fromEntries(LINE_GROUPS.flatMap((g) => g.columns).map((c) => [c.key, { type: 'string' }])),
           },
         },
         required: ['op', 'groupKey', 'lineId'],
@@ -187,6 +188,6 @@ export async function proposeChanges(input: EngineInput, signal?: AbortSignal): 
   } catch {
     return { set: input.pending, dropped: ['model returned invalid JSON'], ms: Date.now() - started };
   }
-  const result = normalizeProposalSet(toRaw(output as never), { committedLineIds: new Set(input.job.lines.map((l) => l.id)) });
+  const result = normalizeProposalSet(toRaw(output as never), { committedLineIds: committedLineIds(input.job.lines) });
   return { ...result, ms: Date.now() - started };
 }

@@ -5,7 +5,9 @@ import {
   LINE_GROUPS,
   SECTIONS,
   formatDuration,
+  fieldOpKey,
   formatValue,
+  lineOpKey,
   missingColumns,
   opKey,
   type FieldValue,
@@ -33,7 +35,7 @@ function FieldRows({ section, job, draft, onReject, onEdit }: { section: string;
       {FIELDS.filter((f) => f.section === section).map((f) => {
         const committed = job.values[f.key];
         const op = draft.pending.fieldOps.find((o) => o.fieldKey === f.key);
-        const key = `field:${f.key}`;
+        const key = fieldOpKey(f.key);
         let kind: RowKind = 'committed';
         let value = formatValue(f, committed);
         let previous: string | undefined;
@@ -52,6 +54,7 @@ function FieldRows({ section, job, draft, onReject, onEdit }: { section: string;
             label={f.label}
             value={value}
             previous={previous}
+            stage={draft.stage[key]}
             changedAt={draft.changedAt[key]}
             onReject={() => onReject(key)}
             onPress={onEdit ? () => onEdit({ kind: 'field', fieldKey: f.key }) : undefined}
@@ -84,12 +87,13 @@ function MaterialRows({ job, draft, onReject, onEdit }: { job: JobDetailDto; dra
         return (
           <ProposalRow
             key={l.id}
-            rowKey={`line:${l.id}`}
+            rowKey={lineOpKey(l.id)}
             tall
             kind={kind}
             label={titleCase(values.material)}
             sublabel={lineSub(values)}
             badge={op?.op === 'delete' ? 'Remove' : undefined}
+            stage={op ? draft.stage[opKey(op)] : undefined}
             changedAt={op ? draft.changedAt[opKey(op)] : undefined}
             onReject={op ? () => onReject(opKey(op)) : undefined}
             onPress={onEdit ? () => onEdit({ kind: 'line', lineId: l.id }) : undefined}
@@ -109,6 +113,7 @@ function MaterialRows({ job, draft, onReject, onEdit }: { job: JobDetailDto; dra
             label={v.material ? titleCase(v.material) : 'New material'}
             sublabel={missing.length ? `${lineSub(v)} · ${missing.join(', ')} missing` : lineSub(v)}
             badge={missing.length ? `Needs ${missing[0]}` : 'New'}
+            stage={draft.stage[opKey(op)]}
             changedAt={draft.changedAt[opKey(op)]}
             onReject={() => onReject(opKey(op))}
             onPress={onEdit ? () => onEdit({ kind: 'line', lineId: op.lineId }) : undefined}

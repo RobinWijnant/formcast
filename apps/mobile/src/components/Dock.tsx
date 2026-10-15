@@ -7,13 +7,13 @@ import { Icon } from './Icon';
 import { Button, T } from './ui';
 
 function useElapsed(startedAt: number | null) {
-  const [now, setNow] = useState(Date.now());
+  const [now, setNow] = useState<number | null>(null);
   useEffect(() => {
     if (!startedAt) return;
     const t = setInterval(() => setNow(Date.now()), 500);
     return () => clearInterval(t);
   }, [startedAt]);
-  if (!startedAt) return '00:00';
+  if (!startedAt || now === null) return '00:00';
   const s = Math.max(0, Math.floor((now - startedAt) / 1000));
   return `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
 }
@@ -33,6 +33,7 @@ export function Dock({
   showTranscript,
   levels,
   startedAt,
+  error,
   onStop,
 }: {
   state: VoiceState;
@@ -40,6 +41,8 @@ export function Dock({
   showTranscript: boolean;
   levels: number[];
   startedAt: number | null;
+  /** A problem that doesn't end the session, e.g. the model failing to update the form. */
+  error?: VoiceError;
   onStop: () => void;
 }) {
   const insets = useSafeAreaInsets();
@@ -51,6 +54,12 @@ export function Dock({
 
   return (
     <View style={[styles.dock, { paddingBottom: Math.max(insets.bottom, 16) + 12 }]}>
+      {error ? (
+        <View style={styles.inlineErr} accessibilityRole="alert">
+          <Icon name="info" color={colors.dockErrorIcon} size={18} />
+          <T style={styles.inlineErrText}>{error.message}</T>
+        </View>
+      ) : null}
       {showTranscript ? (
         <T style={styles.transcript} numberOfLines={3}>
           {earlier ? `${earlier} ` : ''}
@@ -59,7 +68,7 @@ export function Dock({
       ) : null}
       <View style={styles.row}>
         <View style={styles.status}>
-          <View style={[styles.dot, { backgroundColor: state === 'updating' ? colors.amber : state === 'listening' ? '#F04438' : '#8A9096' }]} />
+          <View style={[styles.dot, { backgroundColor: state === 'updating' ? colors.amber : state === 'listening' ? colors.recordDot : colors.dockFaint }]} />
           <T style={styles.statusText}>{label[state]}</T>
           <T style={styles.timer}>{elapsed}</T>
           <View style={styles.levels} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
@@ -88,7 +97,7 @@ export function DockError({ error, onRetry, onDismiss }: { error: NonNullable<Vo
   return (
     <View style={[styles.dock, { paddingBottom: Math.max(insets.bottom, 16) + 12 }]}>
       <View style={styles.err} accessibilityRole="alert">
-        <Icon name="wifiOff" color="#F49A8F" size={22} />
+        <Icon name="wifiOff" color={colors.dockErrorIcon} size={22} />
         <View style={{ flex: 1, gap: 4 }}>
           <T style={styles.errTitle}>{error.kind === 'model' ? 'Form update failed' : error.kind === 'speech' ? 'Speech recognition stopped' : 'Connection lost'}</T>
           <T style={styles.errText}>{error.message}</T>
@@ -96,7 +105,7 @@ export function DockError({ error, onRetry, onDismiss }: { error: NonNullable<Vo
       </View>
       <View style={{ flexDirection: 'row', gap: 10 }}>
         <Button title="Close" variant="ghost" onPress={onDismiss} style={{ backgroundColor: colors.dockButton }} />
-        <Button title="Retry now" onPress={onRetry} style={{ flex: 1, backgroundColor: '#FFFFFF' }} variant="quiet" />
+        <Button title="Retry now" onPress={onRetry} style={{ flex: 1, backgroundColor: colors.surface }} variant="quiet" />
       </View>
     </View>
   );
@@ -105,17 +114,19 @@ export function DockError({ error, onRetry, onDismiss }: { error: NonNullable<Vo
 const styles = StyleSheet.create({
   dock: { position: 'absolute', left: 0, right: 0, bottom: 0, backgroundColor: colors.dock, borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingTop: 20, paddingHorizontal: 20, gap: 14 },
   transcript: { color: colors.dockMuted, fontSize: 17, lineHeight: 24 },
-  latest: { color: '#FFFFFF', fontFamily: fonts.medium, fontSize: 17 },
+  latest: { color: colors.onInk, fontFamily: fonts.medium, fontSize: 17 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 16 },
   status: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8 },
   dot: { width: 8, height: 8, borderRadius: 4 },
   statusText: { color: colors.dockText, fontSize: 13 },
-  timer: { color: '#8A9096', fontSize: 13, fontFamily: fonts.mono },
+  timer: { color: colors.dockFaint, fontSize: 13, fontFamily: fonts.mono },
   levels: { flexDirection: 'row', alignItems: 'center', gap: 3, marginLeft: 'auto', height: 20 },
   bar: { width: 3, borderRadius: 2, backgroundColor: colors.amber },
   stop: { width: 64, height: 64, borderRadius: 32, backgroundColor: colors.redRecord, alignItems: 'center', justifyContent: 'center' },
-  stopSquare: { width: 20, height: 20, borderRadius: 5, backgroundColor: '#FFFFFF' },
-  err: { flexDirection: 'row', gap: 12, backgroundColor: '#3A1D1A', borderRadius: 16, padding: 14 },
-  errTitle: { color: '#FFFFFF', fontFamily: fonts.semibold, fontSize: 15 },
-  errText: { color: '#E3C4BF', fontSize: 14, lineHeight: 20 },
+  stopSquare: { width: 20, height: 20, borderRadius: 5, backgroundColor: colors.onInk },
+  inlineErr: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: colors.dockErrorFill, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 9 },
+  inlineErrText: { flex: 1, color: colors.dockErrorText, fontSize: 14, lineHeight: 19 },
+  err: { flexDirection: 'row', gap: 12, backgroundColor: colors.dockErrorFill, borderRadius: 16, padding: 14 },
+  errTitle: { color: colors.onInk, fontFamily: fonts.semibold, fontSize: 15 },
+  errText: { color: colors.dockErrorText, fontSize: 14, lineHeight: 20 },
 });

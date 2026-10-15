@@ -1,5 +1,6 @@
 import { StyleSheet } from 'react-native';
 import MapView, { Marker } from 'react-native-maps';
+import { colors } from '@/lib/theme';
 
 /** Static, non-interactive map (Apple Maps on iOS, no API key needed). */
 export function MapBackground({ lat, lng, pin = true }: { lat: number; lng: number; pin?: boolean }) {
@@ -15,7 +16,7 @@ export function MapBackground({ lat, lng, pin = true }: { lat: number; lng: numb
       showsPointsOfInterests={false}
       initialRegion={{ latitude: lat, longitude: lng, latitudeDelta: 0.01, longitudeDelta: 0.01 }}
     >
-      {pin ? <Marker coordinate={{ latitude: lat, longitude: lng }} pinColor="#E5483A" /> : null}
+      {pin ? <Marker coordinate={{ latitude: lat, longitude: lng }} pinColor={colors.mapPin} /> : null}
     </MapView>
   );
 }

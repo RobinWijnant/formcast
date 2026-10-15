@@ -7,26 +7,40 @@ import { ProposalRow } from '@/components/ProposalRow';
 import { Button, T } from '@/components/ui';
 import { usePrefs } from '@/lib/prefs';
 import { colors, fonts } from '@/lib/theme';
+import { FILL_FLASH_MS, type FillStage } from '@/voice/drafts';
 
 const SENTENCE = '“Used fifteen meters of cable”';
 const LOOP_MS = 9000;
+const TYPE_MS = 45;
+const HEARD_AT = SENTENCE.length * TYPE_MS + 300;
+/** The demo row joins its countdown halfway, so the fill comes quickly. */
+const COUNTDOWN_LEFT_MS = 2500;
 
 /** Plays the fill animation on a loop: speech appears, the row is heard, then fills. */
 function Demo() {
   const [cycle, setCycle] = useState(0);
   const [typed, setTyped] = useState(0);
   const [heardAt, setHeardAt] = useState<number | null>(null);
+  const [stage, setStage] = useState<FillStage | undefined>('heard');
 
   useEffect(() => {
-    setTyped(0);
-    setHeardAt(null);
-    const typing = setInterval(() => setTyped((n) => Math.min(SENTENCE.length, n + 1)), 45);
-    const heard = setTimeout(() => setHeardAt(Date.now()), SENTENCE.length * 45 + 300);
-    const next = setTimeout(() => setCycle((c) => c + 1), LOOP_MS);
+    const typing = setInterval(() => setTyped((n) => Math.min(SENTENCE.length, n + 1)), TYPE_MS);
+    const timers = [
+      setTimeout(() => {
+        setHeardAt(Date.now());
+        setStage('heard');
+      }, HEARD_AT),
+      setTimeout(() => setStage('flash'), HEARD_AT + COUNTDOWN_LEFT_MS),
+      setTimeout(() => setStage(undefined), HEARD_AT + COUNTDOWN_LEFT_MS + FILL_FLASH_MS),
+      setTimeout(() => {
+        setTyped(0);
+        setHeardAt(null);
+        setCycle((c) => c + 1);
+      }, LOOP_MS),
+    ];
     return () => {
       clearInterval(typing);
-      clearTimeout(heard);
-      clearTimeout(next);
+      timers.forEach(clearTimeout);
     };
   }, [cycle]);
 
@@ -38,7 +52,7 @@ function Demo() {
       </View>
       <View style={styles.demo}>
         {heardAt ? (
-          <ProposalRow key={`${cycle}`} kind="pending" tall label="Cable" sublabel="15 m" badge="New" changedAt={heardAt - 2500} onReject={() => undefined} />
+          <ProposalRow key={`${cycle}`} kind="pending" tall label="Cable" sublabel="15 m" badge="New" stage={stage} changedAt={heardAt - COUNTDOWN_LEFT_MS} onReject={() => undefined} />
         ) : (
           <ProposalRow kind="committed" tall label="Materials" sublabel="—" />
         )}
@@ -82,8 +96,8 @@ export default function Permission() {
 const styles = StyleSheet.create({
   page: { flex: 1, paddingHorizontal: 24, paddingBottom: 12 },
   say: { flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 52, backgroundColor: colors.ink, borderRadius: 18, paddingHorizontal: 16, paddingVertical: 14 },
-  liveDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#F04438' },
-  sayText: { color: '#FFFFFF', fontSize: 16 },
+  liveDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.recordDot },
+  sayText: { color: colors.onInk, fontSize: 16 },
   demo: { backgroundColor: colors.surface, borderRadius: 20, padding: 6, gap: 4 },
   h1: { fontFamily: fonts.semibold, fontSize: 30, letterSpacing: -0.9, marginTop: 36, marginBottom: 8 },
   sub: { fontSize: 16, lineHeight: 24, color: colors.textMuted },

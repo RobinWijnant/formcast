@@ -17,6 +17,8 @@ export interface FieldDef {
   type: FieldType;
   unit?: string;
   options?: Option[];
+  /** Can't be cleared, only changed. */
+  required?: boolean;
   /** One line for the LLM so it maps speech to the right field. */
   hint: string;
 }
@@ -40,7 +42,7 @@ const opts = (...values: string[]): Option[] =>
   values.map((v) => ({ value: v, label: v.charAt(0).toUpperCase() + v.slice(1).replace(/-/g, ' ') }));
 
 export const FIELDS: FieldDef[] = [
-  { key: 'priority', label: 'Priority', section: 'header', type: 'select', options: opts('low', 'medium', 'high'), hint: 'Urgency of the job or its follow-up.' },
+  { key: 'priority', label: 'Priority', section: 'header', type: 'select', required: true, options: opts('low', 'medium', 'high'), hint: 'Urgency of the job or its follow-up.' },
   { key: 'tags', label: 'Tags', section: 'header', type: 'multiselect', options: opts('warranty', 'follow-up', 'parts-needed'), hint: 'Labels on the job. Urgency is not a tag: "urgent" means priority high.' },
 
   { key: 'brand', label: 'Brand', section: 'appliance', type: 'text', hint: 'Boiler manufacturer, e.g. Vaillant, Viessmann, Bosch.' },

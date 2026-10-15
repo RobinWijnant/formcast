@@ -2,6 +2,7 @@ import { and, asc, desc, eq, gte, inArray, lt, ne, sql } from 'drizzle-orm';
 import {
   APPLIANCE_KEYS,
   FIELD_BY_KEY,
+  committedLineIds,
   missingColumns,
   normalizeProposalSet,
   type FieldValue,
@@ -20,7 +21,18 @@ export class NotFoundError extends Error {}
 
 const TZ = 'Europe/Brussels';
 
-const summary = (j: typeof jobs.$inferSelect, clientName: string): JobSummaryDto => ({
+type JobRow = typeof jobs.$inferSelect;
+
+/**
+ * Form fields stored as columns on the job row instead of in job_values, so the
+ * Today list can show them. Everything outside this map treats them like any field.
+ */
+const JOB_COLUMNS: Record<string, { read: (j: JobRow) => FieldValue; write: (v: FieldValue | undefined) => Partial<JobRow> } | undefined> = {
+  priority: { read: (j) => j.priority, write: (v) => ({ priority: String(v) }) },
+  tags: { read: (j) => j.tags, write: (v) => ({ tags: (v as string[] | undefined) ?? [] }) },
+};
+
+const summary = (j: JobRow, clientName: string): JobSummaryDto => ({
   id: j.id,
   code: j.code,
   title: j.title,
@@ -73,7 +85,8 @@ export async function getJob(id: string, tx: Tx | Db = db): Promise<JobDetailDto
     .orderBy(desc(jobs.scheduledStart))
     .limit(5);
 
-  const values: Record<string, FieldValue> = { priority: row.job.priority, tags: row.job.tags };
+  const values: Record<string, FieldValue> = {};
+  for (const [key, column] of Object.entries(JOB_COLUMNS)) values[key] = column!.read(row.job);
   for (const v of valueRows) values[v.fieldKey] = v.value as FieldValue;
 
   return {
@@ -155,15 +168,14 @@ export async function commit(id: string, baseVersion: number, proposals: unknown
     if (locked.version !== baseVersion) throw new ConflictError('Job changed since it was loaded');
 
     const existing = await tx.select({ id: jobLines.id }).from(jobLines).where(eq(jobLines.jobId, id));
-    const { set, dropped } = normalizeProposalSet(proposals, { committedLineIds: new Set(existing.map((l) => l.id)) });
+    const { set, dropped } = normalizeProposalSet(proposals, { committedLineIds: committedLineIds(existing) });
     const skipped = [...dropped];
     const jobPatch: Partial<typeof jobs.$inferInsert> = {};
 
     for (const op of set.fieldOps) {
-      if (op.fieldKey === 'priority') {
-        jobPatch.priority = op.op === 'set' ? String(op.value) : 'medium';
-      } else if (op.fieldKey === 'tags') {
-        jobPatch.tags = op.op === 'set' ? (op.value as string[]) : [];
+      const column = JOB_COLUMNS[op.fieldKey];
+      if (column) {
+        Object.assign(jobPatch, column.write(op.op === 'set' ? op.value : undefined));
       } else if (op.op === 'clear') {
         await tx.delete(jobValues).where(and(eq(jobValues.jobId, id), eq(jobValues.fieldKey, op.fieldKey)));
       } else {
@@ -202,6 +214,4 @@ export async function commit(id: string, baseVersion: number, proposals: unknown
     return { job: await getJob(id, tx), skipped };
   });
 }
-
-export const committedLineIds = (job: JobDetailDto) => new Set(job.lines.map((l) => l.id));
 export type { ProposalSet };

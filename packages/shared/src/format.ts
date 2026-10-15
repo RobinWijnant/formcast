@@ -1,26 +1,10 @@
+import { FIELD_TYPES } from './fieldTypes';
 import type { FieldValue } from './ops';
 import type { ColumnDef, FieldDef } from './schema';
 
 export function formatValue(def: Pick<FieldDef, 'type' | 'options' | 'unit'> | ColumnDef, value: FieldValue | undefined | null): string {
   if (value === undefined || value === null || (Array.isArray(value) && value.length === 0)) return '—';
-  const label = (v: string) => def.options?.find((o) => o.value === v)?.label ?? v;
-  let s: string;
-  switch (def.type) {
-    case 'boolean':
-      s = value ? 'Yes' : 'No';
-      break;
-    case 'select':
-      s = label(String(value));
-      break;
-    case 'multiselect':
-      s = (value as string[]).map(label).join(', ');
-      break;
-    case 'date':
-      s = new Date(`${value}T00:00:00`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
-      break;
-    default:
-      s = String(value);
-  }
+  const s = FIELD_TYPES[def.type].format(def, value);
   const unit = 'unit' in def ? def.unit : undefined;
   return unit ? `${s} ${unit}` : s;
 }

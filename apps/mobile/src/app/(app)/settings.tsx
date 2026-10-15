@@ -110,7 +110,7 @@ export default function Settings() {
             <Toggle accessibilityLabel="Play recorded demo script instead of the microphone" value={prefs.demoVoice} onValueChange={(v) => prefs.update({ demoVoice: v })} />
           </Row>
         </View>
-        <T style={styles.note}>Streams the brief's demo script instead of the microphone. Each press of Start speaking plays the next round.</T>
+        <T style={styles.note}>Streams the brief’s demo script instead of the microphone. Each press of Start speaking plays the next round.</T>
 
         <T style={styles.sec}>App</T>
         <View style={styles.card}>

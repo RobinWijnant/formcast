@@ -1,13 +1,14 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, type ReactNode } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
-import { useRowRegistry } from './rowRegistry';
 import * as Haptics from 'expo-haptics';
 import Animated, { Easing, useAnimatedStyle, useSharedValue, withDelay, withSequence, withTiming } from 'react-native-reanimated';
 import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
 import { usePrefs } from '@/lib/prefs';
 import { colors, fonts, radius } from '@/lib/theme';
+import { FILL_FLASH_MS, type FillStage } from '@/voice/drafts';
 import { CountdownRing } from './CountdownRing';
 import { Icon } from './Icon';
+import { useRowRegistry } from './rowRegistry';
 import { T } from './ui';
 
 /**
@@ -17,14 +18,15 @@ import { T } from './ui';
  * - incomplete: heard but missing a required column; no timer
  * - removing: a committed value or row that will be cleared/deleted
  * - ghost: a dropped proposal fading out
- * After the timer a pending row "fills": green sweep, pop, 1 s hold, back to
- * neutral with a check that stays until Save.
+ * After the countdown a pending row "fills": green sweep, pop, a hold, back to
+ * neutral with a check that stays until Save. The drafts store owns the timing
+ * (`stage`); this row only animates it.
  */
 export type RowKind = 'committed' | 'pending' | 'incomplete' | 'removing' | 'ghost';
 
-type Phase = 'heard' | 'flash' | 'filled';
-
-const FLASH_HOLD_MS = 1000;
+const SWEEP_MS = 140;
+const FADE_MS = 400;
+const HOLD_MS = FILL_FLASH_MS - SWEEP_MS - FADE_MS;
 const SHINE_WIDTH = 110;
 
 export function ProposalRow({
@@ -34,6 +36,7 @@ export function ProposalRow({
   value,
   previous,
   badge,
+  stage,
   changedAt = 0,
   onReject,
   tall,
@@ -52,6 +55,9 @@ export function ProposalRow({
   /** Committed value being replaced, shown struck through. */
   previous?: string;
   badge?: string;
+  /** Fill stage of the pending op; undefined once settled. */
+  stage?: FillStage;
+  /** Start of the countdown, for the ring. */
   changedAt?: number;
   onReject?: () => void;
   tall?: boolean;
@@ -60,57 +66,41 @@ export function ProposalRow({
   const delay = usePrefs((s) => s.fillDelayMs);
   const vibrate = usePrefs((s) => s.vibrateOnFill);
   const timed = kind === 'pending' || kind === 'removing';
-  const settleAt = changedAt + delay;
-  const [phase, setPhase] = useState<Phase>(() => (!timed ? 'filled' : Date.now() >= settleAt ? 'filled' : 'heard'));
+  const phase = timed ? stage : undefined;
 
-  const sweep = useSharedValue(phase === 'filled' ? 1 : 0);
+  const sweep = useSharedValue(0);
   const flash = useSharedValue(0);
   const scale = useSharedValue(1);
   const shine = useSharedValue(0);
   const rowWidth = useSharedValue(0);
   const ghost = useSharedValue(1);
 
-  useEffect(() => {
-    if (!timed) {
-      setPhase('filled');
-      return;
-    }
-    const wait = settleAt - Date.now();
-    if (wait <= 0) {
-      setPhase('filled');
-      return;
-    }
-    setPhase('heard');
-    sweep.value = 0;
-    flash.value = 0;
-    shine.value = 0;
-    const timer = setTimeout(() => setPhase('flash'), wait);
-    return () => clearTimeout(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [timed, settleAt]);
-
-  // Runs once the row has re-rendered without its amber look, so the green
+  // Starts once the row has re-rendered without its amber look, so the green
   // never sweeps in under the dashed border and ring.
   useEffect(() => {
-    if (phase !== 'flash') return;
+    if (phase !== 'flash') {
+      sweep.set(0);
+      flash.set(0);
+      shine.set(0);
+      return;
+    }
     if (vibrate) void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => undefined);
     // Green sweeps in with the check, the card pops like a stamp while a sheen
     // passes left to right, then it holds and fades.
-    sweep.value = withTiming(1, { duration: 140, easing: Easing.out(Easing.cubic) });
-    shine.value = withDelay(80, withTiming(1, { duration: 600, easing: Easing.inOut(Easing.quad) }));
-    flash.value = withSequence(withTiming(1, { duration: 140 }), withDelay(FLASH_HOLD_MS, withTiming(0, { duration: 400 })));
-    scale.value = withSequence(
-      withTiming(1.04, { duration: 120, easing: Easing.out(Easing.quad) }),
-      withTiming(0.99, { duration: 120, easing: Easing.inOut(Easing.quad) }),
-      withTiming(1, { duration: 160, easing: Easing.out(Easing.quad) }),
+    sweep.set(withTiming(1, { duration: SWEEP_MS, easing: Easing.out(Easing.cubic) }));
+    shine.set(withDelay(80, withTiming(1, { duration: 600, easing: Easing.inOut(Easing.quad) })));
+    flash.set(withSequence(withTiming(1, { duration: SWEEP_MS }), withDelay(HOLD_MS, withTiming(0, { duration: FADE_MS }))));
+    scale.set(
+      withSequence(
+        withTiming(1.04, { duration: 120, easing: Easing.out(Easing.quad) }),
+        withTiming(0.99, { duration: 120, easing: Easing.inOut(Easing.quad) }),
+        withTiming(1, { duration: 160, easing: Easing.out(Easing.quad) }),
+      ),
     );
-    const done = setTimeout(() => setPhase('filled'), 140 + FLASH_HOLD_MS + 400);
-    return () => clearTimeout(done);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [phase]);
+  }, [phase, vibrate, sweep, flash, shine, scale]);
 
   useEffect(() => {
-    if (kind === 'ghost') ghost.value = withTiming(0, { duration: 1100 });
+    if (kind === 'ghost') ghost.set(withTiming(0, { duration: 1100 }));
   }, [kind, ghost]);
 
   const containerStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }], opacity: kind === 'ghost' ? 0.15 + ghost.value * 0.45 : 1 }));
@@ -121,13 +111,13 @@ export function ProposalRow({
     transform: [{ translateX: -SHINE_WIDTH + shine.value * (rowWidth.value + SHINE_WIDTH) }, { skewX: '-20deg' }],
   }));
 
-  const heard = phase === 'heard' && timed;
+  const heard = phase === 'heard';
   const removing = kind === 'removing';
   const tone = heard ? (removing ? 'red' : 'amber') : kind === 'incomplete' ? 'amber' : null;
   const textColor = tone === 'amber' ? colors.amberText : tone === 'red' ? colors.redText : colors.text;
   const valueColor = tone === 'amber' ? colors.amberText : tone === 'red' ? colors.redText : colors.ink;
   const struck = kind === 'ghost' || removing;
-  const showCheck = timed && phase !== 'heard';
+  const showCheck = timed && !heard;
 
   return (
     <Pressable
@@ -152,7 +142,7 @@ export function ProposalRow({
         phase === 'flash' && styles.flash,
         containerStyle,
       ]}
-      onLayout={(e) => (rowWidth.value = e.nativeEvent.layout.width)}
+      onLayout={(e) => rowWidth.set(e.nativeEvent.layout.width)}
     >
       <Animated.View pointerEvents="none" style={[styles.overlay, overlayStyle]} />
       {phase === 'flash' ? (
@@ -160,9 +150,9 @@ export function ProposalRow({
           <Svg width={SHINE_WIDTH} height="100%">
             <Defs>
               <LinearGradient id="shine" x1="0" y1="0" x2="1" y2="0">
-                <Stop offset="0" stopColor="#FFFFFF" stopOpacity={0} />
-                <Stop offset="0.5" stopColor="#FFFFFF" stopOpacity={0.85} />
-                <Stop offset="1" stopColor="#FFFFFF" stopOpacity={0} />
+                <Stop offset="0" stopColor={colors.shine} stopOpacity={0} />
+                <Stop offset="0.5" stopColor={colors.shine} stopOpacity={0.85} />
+                <Stop offset="1" stopColor={colors.shine} stopOpacity={0} />
               </LinearGradient>
             </Defs>
             <Rect width="100%" height="100%" fill="url(#shine)" />
@@ -181,7 +171,7 @@ export function ProposalRow({
       )}
       {badge && (heard || kind === 'incomplete' || kind === 'ghost') ? (
         <View style={[styles.badge, kind === 'ghost' || kind === 'incomplete' ? styles.badgeGray : removing && heard ? styles.badgeRed : null]}>
-          <T style={[styles.badgeText, kind === 'ghost' || kind === 'incomplete' ? { color: '#4A4F54' } : removing && heard ? { color: '#5A1308' } : null]}>{badge}</T>
+          <T style={[styles.badgeText, kind === 'ghost' || kind === 'incomplete' ? { color: colors.badgeGrayText } : removing && heard ? { color: colors.badgeRedText } : null]}>{badge}</T>
         </View>
       ) : null}
       {heard && onReject ? <CountdownRing startedAt={changedAt} duration={delay} onReject={onReject} label="Reject this change" /> : null}
@@ -215,10 +205,10 @@ const styles = StyleSheet.create({
   sublabel: { fontFamily: fonts.mono, fontSize: 13 },
   value: { fontFamily: fonts.mono, fontSize: 15, textAlign: 'right', flexShrink: 1 },
   valueStrong: { fontFamily: fonts.monoMedium },
-  previous: { fontFamily: fonts.mono, fontSize: 13, color: '#8A6A3A', textDecorationLine: 'line-through' },
+  previous: { fontFamily: fonts.mono, fontSize: 13, color: colors.amberPrevious, textDecorationLine: 'line-through' },
   struck: { textDecorationLine: 'line-through' },
   badge: { backgroundColor: colors.amber, borderRadius: 6, paddingHorizontal: 7, paddingVertical: 3 },
-  badgeGray: { backgroundColor: '#E3E5E0' },
-  badgeRed: { backgroundColor: '#F2ADA3' },
+  badgeGray: { backgroundColor: colors.badgeGray },
+  badgeRed: { backgroundColor: colors.badgeRed },
   badgeText: { fontFamily: fonts.semibold, fontSize: 11, letterSpacing: 0.5, color: colors.amberInk, textTransform: 'uppercase' },
 });

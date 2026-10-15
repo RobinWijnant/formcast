@@ -123,6 +123,6 @@ const styles = StyleSheet.create({
   histBorder: { borderTopWidth: 1, borderTopColor: colors.divider },
   histDate: { width: 72, fontFamily: fonts.mono, fontSize: 12, color: colors.textMuted },
   noHistory: { padding: 12, color: colors.textMuted },
-  cta: { position: 'absolute', left: 0, right: 0, bottom: 0, paddingHorizontal: 16, paddingTop: 16, paddingBottom: 12, backgroundColor: colors.ground, borderTopWidth: 1, borderTopColor: '#E2E4DF', gap: 8 },
+  cta: { position: 'absolute', left: 0, right: 0, bottom: 0, paddingHorizontal: 16, paddingTop: 16, paddingBottom: 12, backgroundColor: colors.ground, borderTopWidth: 1, borderTopColor: colors.hairline, gap: 8 },
   error: { color: colors.red, textAlign: 'center' },
 });

@@ -8,7 +8,7 @@ import { Icon } from '@/components/Icon';
 import { IconButton, Pill, T } from '@/components/ui';
 import { api } from '@/lib/api';
 import { addDays, isoDay, longDate, minutesBetween, time, weekStart, weekdayShort } from '@/lib/date';
-import { colors, fonts } from '@/lib/theme';
+import { colors, fonts, PRIORITY_TONE } from '@/lib/theme';
 
 function Gap({ from, to }: { from: string; to: string }) {
   const minutes = minutesBetween(from, to);
@@ -41,12 +41,12 @@ function JobCard({ job, upNext }: { job: JobSummaryDto; upNext: boolean }) {
             {job.code} · {time(job.scheduledStart)}–{time(job.scheduledEnd)}
           </T>
           {done ? (
-            <View style={[styles.status, { backgroundColor: '#E3F3E7' }]}>
+            <View style={[styles.status, { backgroundColor: colors.greenTint }]}>
               <T style={[styles.statusText, { color: colors.greenInk }]}>Done</T>
             </View>
           ) : upNext ? (
             <View style={[styles.status, { backgroundColor: colors.ink }]}>
-              <T style={[styles.statusText, { color: '#FFFFFF' }]}>{job.status === 'in_progress' ? 'In progress' : 'Up next'}</T>
+              <T style={[styles.statusText, { color: colors.onInk }]}>{job.status === 'in_progress' ? 'In progress' : 'Up next'}</T>
             </View>
           ) : null}
         </View>
@@ -54,7 +54,7 @@ function JobCard({ job, upNext }: { job: JobSummaryDto; upNext: boolean }) {
         <T style={[styles.client, done && { color: colors.icon }]}>{job.clientName}</T>
         {!done ? (
           <View style={styles.meta}>
-            <Pill tone={job.priority === 'high' ? 'high' : 'neutral'}>Priority · {job.priority.charAt(0).toUpperCase() + job.priority.slice(1)}</Pill>
+            <Pill tone={job.priority in PRIORITY_TONE ? (job.priority as 'low' | 'medium' | 'high') : 'neutral'}>{job.priority.charAt(0).toUpperCase() + job.priority.slice(1)} prio</Pill>
             {job.tags.map((t) => (
               <Pill key={t}>{t}</Pill>
             ))}
@@ -98,9 +98,9 @@ export default function Today() {
             const has = calendar.data?.includes(d);
             return (
               <Pressable key={d} accessibilityRole="button" accessibilityState={{ selected: on }} onPress={() => setDay(d)} style={[styles.day, on && styles.dayOn]}>
-                <T style={[styles.dayName, on && { color: '#C9CDD0' }]}>{weekdayShort(d)}</T>
-                <T style={[styles.dayNum, on && { color: '#FFFFFF' }]}>{Number(d.slice(8))}</T>
-                <View style={[styles.dayDot, { backgroundColor: has ? (on ? colors.amber : '#B8BCB6') : 'transparent' }]} />
+                <T style={[styles.dayName, on && { color: colors.onInkMuted }]}>{weekdayShort(d)}</T>
+                <T style={[styles.dayNum, on && { color: colors.onInk }]}>{Number(d.slice(8))}</T>
+                <View style={[styles.dayDot, { backgroundColor: has ? (on ? colors.amber : colors.dashed) : 'transparent' }]} />
               </Pressable>
             );
           })}

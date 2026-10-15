@@ -36,6 +36,10 @@ export function useVoiceSession(jobId: string) {
   const queue = useRef<ArrayBuffer[]>([]);
   const demo = useRef<DemoPlayback | null>(null);
   const stopping = useRef(false);
+  /** Resolves `finish()` callers once the socket has closed. */
+  const closed = useRef<(() => void)[]>([]);
+  /** Latest `stop`, for the demo playback that ends on its own. */
+  const stopRef = useRef<() => void>(() => undefined);
 
   const sendAudio = useCallback((data: ArrayBuffer) => {
     const socket = ws.current;
@@ -74,6 +78,8 @@ export function useVoiceSession(jobId: string) {
           break;
         case 'proposals':
           useDrafts.getState().apply(jobId, msg.set, msg.changed, msg.removed);
+          // The form is updating again: a model error shown in the dock is over.
+          setError((e) => (e?.kind === 'model' ? null : e));
           break;
         case 'error':
           setError({ kind: msg.code === 'stt' ? 'speech' : msg.code === 'llm' ? 'model' : 'connection', message: msg.message });
@@ -120,7 +126,7 @@ export function useVoiceSession(jobId: string) {
       let sampleRate = 16000;
       try {
         if (demoVoice) {
-          demo.current = await playDemoRound(sendAudio, () => stop());
+          demo.current = await playDemoRound(sendAudio, () => stopRef.current());
           sampleRate = demo.current.sampleRate;
         } else {
           await stream.start();
@@ -150,8 +156,8 @@ export function useVoiceSession(jobId: string) {
       ready.current = false;
       setStartedAt(null);
       setState('idle');
+      for (const resolve of closed.current.splice(0)) resolve();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [jobId, onMessage, sendAudio, stopAudio, stream]);
 
   const stop = useCallback(() => {
@@ -161,6 +167,21 @@ export function useVoiceSession(jobId: string) {
     send({ type: 'stop' });
     setState('stopping');
   }, [stopAudio]);
+  useEffect(() => {
+    stopRef.current = stop;
+  }, [stop]);
+
+  /** Stops and waits until the server has sent its last proposals and closed. */
+  const finish = useCallback(() => {
+    if (!ws.current) return Promise.resolve();
+    const done = new Promise<void>((resolve) => {
+      closed.current.push(resolve);
+      // The server closes within a few seconds; never hang a Save on it.
+      setTimeout(resolve, 6000);
+    });
+    stop();
+    return done;
+  }, [stop]);
 
   /** Tap on a countdown ring: drop that proposal. */
   const reject = useCallback(
@@ -180,5 +201,5 @@ export function useVoiceSession(jobId: string) {
     [stopAudio],
   );
 
-  return { state, error, clearError: () => setError(null), transcript, levels, startedAt, start, stop, reject, active: state !== 'idle' };
+  return { state, error, clearError: () => setError(null), transcript, levels, startedAt, start, stop, finish, reject, active: state !== 'idle' };
 }
